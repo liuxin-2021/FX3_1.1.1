@@ -1,0 +1,285 @@
+   1              		.cpu arm926ej-s
+   2              		.fpu softvfp
+   3              		.eabi_attribute 20, 1
+   4              		.eabi_attribute 21, 1
+   5              		.eabi_attribute 23, 3
+   6              		.eabi_attribute 24, 1
+   7              		.eabi_attribute 25, 1
+   8              		.eabi_attribute 26, 1
+   9              		.eabi_attribute 30, 6
+  10              		.eabi_attribute 34, 0
+  11              		.eabi_attribute 18, 4
+  12              		.file	"cyfx_gpio_spi_standalone_template.c"
+  13              		.text
+  14              	.Ltext0:
+  15              		.cfi_sections	.debug_frame
+  16              		.bss
+  17              		.align	2
+  18              	gSpiWorker:
+  19 0000 00000000 		.space	420
+  19      00000000 
+  19      00000000 
+  19      00000000 
+  19      00000000 
+  20 01a4 00000000 		.align	5
+  20      00000000 
+  20      00000000 
+  20      00000000 
+  20      00000000 
+  21              	gSpiWorkerStack:
+  22 01c0 00000000 		.space	2048
+  22      00000000 
+  22      00000000 
+  22      00000000 
+  22      00000000 
+  23              		.text
+  24              		.align	2
+  25              		.global	CyFxSpiStandaloneStart
+  27              	CyFxSpiStandaloneStart:
+  28              	.LFB0:
+  29              		.file 1 "../standalone_spi/cyfx_gpio_spi_standalone_template.c"
+   1:../standalone_spi/cyfx_gpio_spi_standalone_template.c **** #include "cyu3error.h"
+   2:../standalone_spi/cyfx_gpio_spi_standalone_template.c **** #include "cyu3utils.h"
+   3:../standalone_spi/cyfx_gpio_spi_standalone_template.c **** #include "cyfx_gpio_spi_standalone.h"
+   4:../standalone_spi/cyfx_gpio_spi_standalone_template.c **** 
+   5:../standalone_spi/cyfx_gpio_spi_standalone_template.c **** #define CYFX_SPI_WORKER_STACK_SIZE    (0x0800u)
+   6:../standalone_spi/cyfx_gpio_spi_standalone_template.c **** #define CYFX_SPI_WORKER_PRIORITY      (5u)
+   7:../standalone_spi/cyfx_gpio_spi_standalone_template.c **** 
+   8:../standalone_spi/cyfx_gpio_spi_standalone_template.c **** #define CYFX_SPI_GPIO_CLK             (22u)
+   9:../standalone_spi/cyfx_gpio_spi_standalone_template.c **** #define CYFX_SPI_GPIO_MOSI            (25u)
+  10:../standalone_spi/cyfx_gpio_spi_standalone_template.c **** #define CYFX_SPI_GPIO_MISO            (26u)
+  11:../standalone_spi/cyfx_gpio_spi_standalone_template.c **** #define CYFX_SPI_GPIO_CS_FPGA         (50u)
+  12:../standalone_spi/cyfx_gpio_spi_standalone_template.c **** 
+  13:../standalone_spi/cyfx_gpio_spi_standalone_template.c **** static CyFxGpioSpiWorker_t gSpiWorker;
+  14:../standalone_spi/cyfx_gpio_spi_standalone_template.c **** static uint8_t gSpiWorkerStack[CYFX_SPI_WORKER_STACK_SIZE] __attribute__ ((aligned (32)));
+  15:../standalone_spi/cyfx_gpio_spi_standalone_template.c **** 
+  16:../standalone_spi/cyfx_gpio_spi_standalone_template.c **** CyU3PReturnStatus_t
+  17:../standalone_spi/cyfx_gpio_spi_standalone_template.c **** CyFxSpiStandaloneStart (void)
+  18:../standalone_spi/cyfx_gpio_spi_standalone_template.c **** {
+  30              		.loc 1 18 0
+  31              		.cfi_startproc
+  32              		@ args = 0, pretend = 0, frame = 32
+  33              		@ frame_needed = 1, uses_anonymous_args = 0
+  34 0000 00482DE9 		stmfd	sp!, {fp, lr}
+  35              	.LCFI0:
+  36              		.cfi_def_cfa_offset 8
+  37              		.cfi_offset 11, -8
+  38              		.cfi_offset 14, -4
+  39 0004 04B08DE2 		add	fp, sp, #4
+  40              	.LCFI1:
+  41              		.cfi_def_cfa 11, 4
+  42 0008 30D04DE2 		sub	sp, sp, #48
+  19:../standalone_spi/cyfx_gpio_spi_standalone_template.c ****     CyFxGpioSpiPinMap_t pinMap;
+  20:../standalone_spi/cyfx_gpio_spi_standalone_template.c ****     CyFxGpioSpiTiming_t timing;
+  21:../standalone_spi/cyfx_gpio_spi_standalone_template.c **** 
+  22:../standalone_spi/cyfx_gpio_spi_standalone_template.c ****     pinMap.clk = CYFX_SPI_GPIO_CLK;
+  43              		.loc 1 22 0
+  44 000c 1630A0E3 		mov	r3, #22
+  45 0010 08304BE5 		strb	r3, [fp, #-8]
+  23:../standalone_spi/cyfx_gpio_spi_standalone_template.c ****     pinMap.mosi = CYFX_SPI_GPIO_MOSI;
+  46              		.loc 1 23 0
+  47 0014 1930A0E3 		mov	r3, #25
+  48 0018 07304BE5 		strb	r3, [fp, #-7]
+  24:../standalone_spi/cyfx_gpio_spi_standalone_template.c ****     pinMap.miso = CYFX_SPI_GPIO_MISO;
+  49              		.loc 1 24 0
+  50 001c 1A30A0E3 		mov	r3, #26
+  51 0020 06304BE5 		strb	r3, [fp, #-6]
+  25:../standalone_spi/cyfx_gpio_spi_standalone_template.c ****     pinMap.cs = CYFX_SPI_GPIO_CS_FPGA;
+  52              		.loc 1 25 0
+  53 0024 3230A0E3 		mov	r3, #50
+  54 0028 05304BE5 		strb	r3, [fp, #-5]
+  26:../standalone_spi/cyfx_gpio_spi_standalone_template.c **** 
+  27:../standalone_spi/cyfx_gpio_spi_standalone_template.c ****     timing.cpolIdleHigh = CyFalse;
+  55              		.loc 1 27 0
+  56 002c 0030A0E3 		mov	r3, #0
+  57 0030 20300BE5 		str	r3, [fp, #-32]
+  28:../standalone_spi/cyfx_gpio_spi_standalone_template.c ****     timing.cphaSecondEdge = CyFalse;
+  58              		.loc 1 28 0
+  59 0034 0030A0E3 		mov	r3, #0
+  60 0038 1C300BE5 		str	r3, [fp, #-28]
+  29:../standalone_spi/cyfx_gpio_spi_standalone_template.c ****     timing.bitOrder = CYFX_SPI_BIT_ORDER_MSB_FIRST;
+  61              		.loc 1 29 0
+  62 003c 0030A0E3 		mov	r3, #0
+  63 0040 18304BE5 		strb	r3, [fp, #-24]
+  30:../standalone_spi/cyfx_gpio_spi_standalone_template.c ****     timing.halfPeriodUs = 0u;
+  64              		.loc 1 30 0
+  65 0044 0030A0E3 		mov	r3, #0
+  66 0048 14300BE5 		str	r3, [fp, #-20]
+  31:../standalone_spi/cyfx_gpio_spi_standalone_template.c ****     timing.edgeDelayCycles = 20u;
+  67              		.loc 1 31 0
+  68 004c 1430A0E3 		mov	r3, #20
+  69 0050 10300BE5 		str	r3, [fp, #-16]
+  32:../standalone_spi/cyfx_gpio_spi_standalone_template.c ****     timing.allowShortCriticalSection = CyTrue;
+  70              		.loc 1 32 0
+  71 0054 0130A0E3 		mov	r3, #1
+  72 0058 0C300BE5 		str	r3, [fp, #-12]
+  33:../standalone_spi/cyfx_gpio_spi_standalone_template.c **** 
+  34:../standalone_spi/cyfx_gpio_spi_standalone_template.c ****     return CyFxGpioSpiWorkerCreate (&gSpiWorker,
+  73              		.loc 1 34 0
+  74 005c 08204BE2 		sub	r2, fp, #8
+  75 0060 20304BE2 		sub	r3, fp, #32
+  76 0064 021BA0E3 		mov	r1, #2048
+  77 0068 00108DE5 		str	r1, [sp]
+  78 006c 0510A0E3 		mov	r1, #5
+  79 0070 04108DE5 		str	r1, [sp, #4]
+  80 0074 0110A0E3 		mov	r1, #1
+  81 0078 08108DE5 		str	r1, [sp, #8]
+  82 007c 1C009FE5 		ldr	r0, .L3
+  83 0080 0210A0E1 		mov	r1, r2
+  84 0084 0320A0E1 		mov	r2, r3
+  85 0088 14309FE5 		ldr	r3, .L3+4
+  86 008c FEFFFFEB 		bl	CyFxGpioSpiWorkerCreate
+  87 0090 0030A0E1 		mov	r3, r0
+  35:../standalone_spi/cyfx_gpio_spi_standalone_template.c ****                                     &pinMap,
+  36:../standalone_spi/cyfx_gpio_spi_standalone_template.c ****                                     &timing,
+  37:../standalone_spi/cyfx_gpio_spi_standalone_template.c ****                                     gSpiWorkerStack,
+  38:../standalone_spi/cyfx_gpio_spi_standalone_template.c ****                                     sizeof(gSpiWorkerStack),
+  39:../standalone_spi/cyfx_gpio_spi_standalone_template.c ****                                     CYFX_SPI_WORKER_PRIORITY,
+  40:../standalone_spi/cyfx_gpio_spi_standalone_template.c ****                                     CYU3P_AUTO_START);
+  41:../standalone_spi/cyfx_gpio_spi_standalone_template.c **** }
+  88              		.loc 1 41 0
+  89 0094 0300A0E1 		mov	r0, r3
+  90 0098 04D04BE2 		sub	sp, fp, #4
+  91              		@ sp needed
+  92 009c 0088BDE8 		ldmfd	sp!, {fp, pc}
+  93              	.L4:
+  94              		.align	2
+  95              	.L3:
+  96 00a0 00000000 		.word	gSpiWorker
+  97 00a4 C0010000 		.word	gSpiWorkerStack
+  98              		.cfi_endproc
+  99              	.LFE0:
+ 101              		.align	2
+ 102              		.global	CyFxSpiStandaloneStop
+ 104              	CyFxSpiStandaloneStop:
+ 105              	.LFB1:
+  42:../standalone_spi/cyfx_gpio_spi_standalone_template.c **** 
+  43:../standalone_spi/cyfx_gpio_spi_standalone_template.c **** void
+  44:../standalone_spi/cyfx_gpio_spi_standalone_template.c **** CyFxSpiStandaloneStop (void)
+  45:../standalone_spi/cyfx_gpio_spi_standalone_template.c **** {
+ 106              		.loc 1 45 0
+ 107              		.cfi_startproc
+ 108              		@ args = 0, pretend = 0, frame = 0
+ 109              		@ frame_needed = 1, uses_anonymous_args = 0
+ 110 00a8 00482DE9 		stmfd	sp!, {fp, lr}
+ 111              	.LCFI2:
+ 112              		.cfi_def_cfa_offset 8
+ 113              		.cfi_offset 11, -8
+ 114              		.cfi_offset 14, -4
+ 115 00ac 04B08DE2 		add	fp, sp, #4
+ 116              	.LCFI3:
+ 117              		.cfi_def_cfa 11, 4
+  46:../standalone_spi/cyfx_gpio_spi_standalone_template.c ****     CyFxGpioSpiWorkerDestroy (&gSpiWorker);
+ 118              		.loc 1 46 0
+ 119 00b0 04009FE5 		ldr	r0, .L6
+ 120 00b4 FEFFFFEB 		bl	CyFxGpioSpiWorkerDestroy
+  47:../standalone_spi/cyfx_gpio_spi_standalone_template.c **** }
+ 121              		.loc 1 47 0
+ 122 00b8 0088BDE8 		ldmfd	sp!, {fp, pc}
+ 123              	.L7:
+ 124              		.align	2
+ 125              	.L6:
+ 126 00bc 00000000 		.word	gSpiWorker
+ 127              		.cfi_endproc
+ 128              	.LFE1:
+ 130              		.align	2
+ 131              		.global	CyFxSpiStandaloneFpgaWrite24
+ 133              	CyFxSpiStandaloneFpgaWrite24:
+ 134              	.LFB2:
+  48:../standalone_spi/cyfx_gpio_spi_standalone_template.c **** 
+  49:../standalone_spi/cyfx_gpio_spi_standalone_template.c **** CyU3PReturnStatus_t
+  50:../standalone_spi/cyfx_gpio_spi_standalone_template.c **** CyFxSpiStandaloneFpgaWrite24 (uint8_t chipId, uint8_t address, uint8_t value)
+  51:../standalone_spi/cyfx_gpio_spi_standalone_template.c **** {
+ 135              		.loc 1 51 0
+ 136              		.cfi_startproc
+ 137              		@ args = 0, pretend = 0, frame = 16
+ 138              		@ frame_needed = 1, uses_anonymous_args = 0
+ 139 00c0 00482DE9 		stmfd	sp!, {fp, lr}
+ 140              	.LCFI4:
+ 141              		.cfi_def_cfa_offset 8
+ 142              		.cfi_offset 11, -8
+ 143              		.cfi_offset 14, -4
+ 144 00c4 04B08DE2 		add	fp, sp, #4
+ 145              	.LCFI5:
+ 146              		.cfi_def_cfa 11, 4
+ 147 00c8 18D04DE2 		sub	sp, sp, #24
+ 148 00cc 0230A0E1 		mov	r3, r2
+ 149 00d0 0020A0E1 		mov	r2, r0
+ 150 00d4 0D204BE5 		strb	r2, [fp, #-13]
+ 151 00d8 0120A0E1 		mov	r2, r1
+ 152 00dc 0E204BE5 		strb	r2, [fp, #-14]
+ 153 00e0 0F304BE5 		strb	r3, [fp, #-15]
+  52:../standalone_spi/cyfx_gpio_spi_standalone_template.c ****     uint32_t tx24;
+  53:../standalone_spi/cyfx_gpio_spi_standalone_template.c **** 
+  54:../standalone_spi/cyfx_gpio_spi_standalone_template.c ****     tx24 = (((uint32_t)chipId) << 16) |
+ 154              		.loc 1 54 0
+ 155 00e4 0D305BE5 		ldrb	r3, [fp, #-13]	@ zero_extendqisi2
+ 156 00e8 0328A0E1 		mov	r2, r3, asl #16
+  55:../standalone_spi/cyfx_gpio_spi_standalone_template.c ****            (((uint32_t)address) << 8) |
+ 157              		.loc 1 55 0
+ 158 00ec 0E305BE5 		ldrb	r3, [fp, #-14]	@ zero_extendqisi2
+ 159 00f0 0334A0E1 		mov	r3, r3, asl #8
+  54:../standalone_spi/cyfx_gpio_spi_standalone_template.c ****            (((uint32_t)address) << 8) |
+ 160              		.loc 1 54 0
+ 161 00f4 032082E1 		orr	r2, r2, r3
+  56:../standalone_spi/cyfx_gpio_spi_standalone_template.c ****            ((uint32_t)value);
+ 162              		.loc 1 56 0
+ 163 00f8 0F305BE5 		ldrb	r3, [fp, #-15]	@ zero_extendqisi2
+  54:../standalone_spi/cyfx_gpio_spi_standalone_template.c ****            (((uint32_t)address) << 8) |
+ 164              		.loc 1 54 0
+ 165 00fc 033082E1 		orr	r3, r2, r3
+ 166 0100 08300BE5 		str	r3, [fp, #-8]
+  57:../standalone_spi/cyfx_gpio_spi_standalone_template.c **** 
+  58:../standalone_spi/cyfx_gpio_spi_standalone_template.c ****     return CyFxGpioSpiWorkerTransfer24 (&gSpiWorker,
+ 167              		.loc 1 58 0
+ 168 0104 0030E0E3 		mvn	r3, #0
+ 169 0108 00308DE5 		str	r3, [sp]
+ 170 010c 1C009FE5 		ldr	r0, .L10
+ 171 0110 08101BE5 		ldr	r1, [fp, #-8]
+ 172 0114 0020A0E3 		mov	r2, #0
+ 173 0118 0130A0E3 		mov	r3, #1
+ 174 011c FEFFFFEB 		bl	CyFxGpioSpiWorkerTransfer24
+ 175 0120 0030A0E1 		mov	r3, r0
+  59:../standalone_spi/cyfx_gpio_spi_standalone_template.c ****                                         tx24,
+  60:../standalone_spi/cyfx_gpio_spi_standalone_template.c ****                                         0,
+  61:../standalone_spi/cyfx_gpio_spi_standalone_template.c ****                                         CyTrue,
+  62:../standalone_spi/cyfx_gpio_spi_standalone_template.c ****                                         CYU3P_WAIT_FOREVER);
+  63:../standalone_spi/cyfx_gpio_spi_standalone_template.c **** }
+ 176              		.loc 1 63 0
+ 177 0124 0300A0E1 		mov	r0, r3
+ 178 0128 04D04BE2 		sub	sp, fp, #4
+ 179              		@ sp needed
+ 180 012c 0088BDE8 		ldmfd	sp!, {fp, pc}
+ 181              	.L11:
+ 182              		.align	2
+ 183              	.L10:
+ 184 0130 00000000 		.word	gSpiWorker
+ 185              		.cfi_endproc
+ 186              	.LFE2:
+ 188              	.Letext0:
+ 189              		.file 2 "c:\\program files (x86)\\cypress\\ez-usb fx3 sdk\\1.3\\arm gcc\\arm-none-eabi\\include\\s
+ 190              		.file 3 "C:\\Program Files (x86)\\Cypress\\EZ-USB FX3 SDK\\1.3\\firmware\\u3p_firmware\\inc/cyu3ty
+ 191              		.file 4 "C:\\Program Files (x86)\\Cypress\\EZ-USB FX3 SDK\\1.3\\firmware\\u3p_firmware\\inc/tx_por
+ 192              		.file 5 "C:\\Program Files (x86)\\Cypress\\EZ-USB FX3 SDK\\1.3\\firmware\\u3p_firmware\\inc/tx_api
+ 193              		.file 6 "C:\\Program Files (x86)\\Cypress\\EZ-USB FX3 SDK\\1.3\\firmware\\u3p_firmware\\inc/cyu3dm
+ 194              		.file 7 "../standalone_spi/cyfx_gpio_spi_standalone.h"
+DEFINED SYMBOLS
+                            *ABS*:00000000 cyfx_gpio_spi_standalone_template.c
+C:\Users\liuxin\AppData\Local\Temp\ccUUASTT.s:17     .bss:00000000 $d
+C:\Users\liuxin\AppData\Local\Temp\ccUUASTT.s:18     .bss:00000000 gSpiWorker
+C:\Users\liuxin\AppData\Local\Temp\ccUUASTT.s:21     .bss:000001c0 gSpiWorkerStack
+C:\Users\liuxin\AppData\Local\Temp\ccUUASTT.s:24     .text:00000000 $a
+C:\Users\liuxin\AppData\Local\Temp\ccUUASTT.s:27     .text:00000000 CyFxSpiStandaloneStart
+C:\Users\liuxin\AppData\Local\Temp\ccUUASTT.s:96     .text:000000a0 $d
+C:\Users\liuxin\AppData\Local\Temp\ccUUASTT.s:101    .text:000000a8 $a
+C:\Users\liuxin\AppData\Local\Temp\ccUUASTT.s:104    .text:000000a8 CyFxSpiStandaloneStop
+C:\Users\liuxin\AppData\Local\Temp\ccUUASTT.s:126    .text:000000bc $d
+C:\Users\liuxin\AppData\Local\Temp\ccUUASTT.s:130    .text:000000c0 $a
+C:\Users\liuxin\AppData\Local\Temp\ccUUASTT.s:133    .text:000000c0 CyFxSpiStandaloneFpgaWrite24
+C:\Users\liuxin\AppData\Local\Temp\ccUUASTT.s:184    .text:00000130 $d
+                     .debug_frame:00000010 $d
+
+UNDEFINED SYMBOLS
+CyFxGpioSpiWorkerCreate
+CyFxGpioSpiWorkerDestroy
+CyFxGpioSpiWorkerTransfer24

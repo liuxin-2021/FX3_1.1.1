@@ -1,0 +1,114 @@
+{
+  // VS Code build tasks for Cypress FX3 firmware
+  // 需要在系统上安装 Cypress EZ-USB FX3 SDK（建议 1.3），并确保 ARM GCC 工具链和 elf2img 可用。
+  // 若未全局配置 PATH，可在这里用 options.env 指定。
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "FX3 Debug: Build",
+      "type": "shell",
+      "command": "make",
+      "args": [],
+      "options": {
+        "cwd": "${workspaceFolder}/Debug",
+        "shell": { "executable": "powershell.exe" },
+        "env": {
+          "PATH": "C:/Program Files (x86)/Cypress/EZ-USB FX3 SDK/1.3/ARM GCC/bin;${env:PATH}",
+          "FX3_SDK": "C:/Program Files (x86)/Cypress/EZ-USB FX3 SDK/1.3"
+        }
+      },
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "FX3 Debug: Build + Package",
+      "type": "shell",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-Command",
+        "make; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; Copy-Item -Force ios.elf, ios.img -Destination ../out/"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/Debug",
+        "shell": { "executable": "powershell.exe" },
+        "env": {
+          "PATH": "C:/Program Files (x86)/Cypress/EZ-USB FX3 SDK/1.3/ARM GCC/bin;${env:PATH}",
+          "FX3_SDK": "C:/Program Files (x86)/Cypress/EZ-USB FX3 SDK/1.3"
+        }
+      },
+      "group": { "kind": "build" },
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "FX3 Debug: Clean",
+      "type": "shell",
+      "command": "make",
+      "args": ["clean"],
+      "options": {
+        "cwd": "${workspaceFolder}/Debug",
+        "shell": { "executable": "powershell.exe" },
+        "env": {
+          "PATH": "C:/Program Files (x86)/Cypress/EZ-USB FX3 SDK/1.3/ARM GCC/bin;${env:PATH}",
+          "FX3_SDK": "C:/Program Files (x86)/Cypress/EZ-USB FX3 SDK/1.3"
+        }
+      },
+      "group": { "kind": "build" },
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "FX3 Release: Build",
+      "type": "shell",
+      "command": "make",
+      "args": [],
+      "options": {
+        "cwd": "${workspaceFolder}/Release",
+        "shell": { "executable": "powershell.exe" },
+        "env": {
+          "PATH": "C:/Program Files (x86)/Cypress/EZ-USB FX3 SDK/1.3/ARM GCC/bin;${env:PATH}",
+          "FX3_SDK": "C:/Program Files (x86)/Cypress/EZ-USB FX3 SDK/1.3"
+        }
+      },
+      "group": { "kind": "build" },
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "FX3 Release: Build + Package",
+      "type": "shell",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-Command",
+        "make; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; Copy-Item -Force SlaveFifoSync.elf, SlaveFifoSync.img -Destination ../out/"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/Release",
+        "shell": { "executable": "powershell.exe" },
+        "env": {
+          "PATH": "C:/Program Files (x86)/Cypress/EZ-USB FX3 SDK/1.3/ARM GCC/bin;${env:PATH}",
+          "FX3_SDK": "C:/Program Files (x86)/Cypress/EZ-USB FX3 SDK/1.3"
+        }
+      },
+      "group": { "kind": "build" },
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "FX3 Release: Clean",
+      "type": "shell",
+      "command": "make",
+      "args": ["clean"],
+      "options": {
+        "cwd": "${workspaceFolder}/Release",
+        "shell": { "executable": "powershell.exe" },
+        "env": {
+          "PATH": "C:/Program Files (x86)/Cypress/EZ-USB FX3 SDK/1.3/ARM GCC/bin;${env:PATH}",
+          "FX3_SDK": "C:/Program Files (x86)/Cypress/EZ-USB FX3 SDK/1.3"
+        }
+      },
+      "group": { "kind": "build" },
+      "problemMatcher": ["$gcc"]
+    }
+  ]
+}

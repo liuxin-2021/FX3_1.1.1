@@ -1,0 +1,2293 @@
+   1              		.cpu arm926ej-s
+   2              		.fpu softvfp
+   3              		.eabi_attribute 20, 1
+   4              		.eabi_attribute 21, 1
+   5              		.eabi_attribute 23, 3
+   6              		.eabi_attribute 24, 1
+   7              		.eabi_attribute 25, 1
+   8              		.eabi_attribute 26, 1
+   9              		.eabi_attribute 30, 6
+  10              		.eabi_attribute 34, 0
+  11              		.eabi_attribute 18, 4
+  12              		.file	"ar0234.c"
+  13              		.text
+  14              	.Ltext0:
+  15              		.cfi_sections	.debug_frame
+  16              		.comm	glAr0234Buffer,64,32
+  17              		.comm	AR0234ContextConfig,56,4
+  18              		.data
+  19              		.align	2
+  22              	glLastTempSensor1:
+  23 0000 00005E42 		.word	1113456640
+  24              		.align	2
+  27              	glLastTempSensor2:
+  28 0004 00005E42 		.word	1113456640
+  29              		.bss
+  30              		.align	2
+  31              	glIsTempMonitorActive:
+  32 0000 00000000 		.space	4
+  33              		.align	2
+  34              	glAr0234TxnMutex:
+  35 0004 00000000 		.space	56
+  35      00000000 
+  35      00000000 
+  35      00000000 
+  35      00000000 
+  36              		.align	2
+  37              	glAr0234TxnMutexReady:
+  38 003c 00000000 		.space	4
+  39              		.align	2
+  40              	glTempSensorEnabled:
+  41 0040 00000000 		.space	4
+  42              		.align	2
+  43              	glTempCalibrationValid:
+  44 0044 00000000 		.space	4
+  45              		.align	1
+  46              	glTempCalibSensor1:
+  47 0048 0000     		.space	2
+  48              		.align	1
+  49              	glTempCalibSensor2:
+  50 004a 0000     		.space	2
+  51              		.text
+  52              		.align	2
+  54              	AR0234_TxnInit:
+  55              	.LFB0:
+  56              		.file 1 "../ar0234.c"
+   1:../ar0234.c   **** #include "ar0234.h"
+   2:../ar0234.c   **** #include "cyfxslfifosync.h"
+   3:../ar0234.c   **** #include "cyu3error.h"
+   4:../ar0234.c   **** #include "cyu3system.h"
+   5:../ar0234.c   **** 
+   6:../ar0234.c   **** 
+   7:../ar0234.c   **** uint8_t glAr0234Buffer[64]  __attribute__ ((aligned (32)));  // Reduced from 1024 to 64 bytes - onl
+   8:../ar0234.c   **** AR0234ContextConfig_t AR0234ContextConfig;
+   9:../ar0234.c   **** 
+  10:../ar0234.c   **** // 温度监控相关变量（仅保留最近一次的温度值；去除10s定时器与触发标志）
+  11:../ar0234.c   **** static float glLastTempSensor1 = 55.5f;  // 改成 55.5 用于调试区分：没启动时为55.5，传感器读错时为5
+  12:../ar0234.c   **** static float glLastTempSensor2 = 55.5f;  // 改成 55.5 用于调试区分：没启动时为55.5，传感器读错时为5
+  13:../ar0234.c   **** static CyBool_t glIsTempMonitorActive = CyFalse; // 是否启动了后台循环读取
+  14:../ar0234.c   **** 
+  15:../ar0234.c   **** /* AR0234寄存器访问事务锁，避免多线程下读写序列被交叉打断。 */
+  16:../ar0234.c   **** static CyU3PMutex glAr0234TxnMutex;
+  17:../ar0234.c   **** static CyBool_t glAr0234TxnMutexReady = CyFalse;
+  18:../ar0234.c   **** 
+  19:../ar0234.c   **** /* 温度链路优化：使能与校准值缓存，避免每次轮询重复做重操作。 */
+  20:../ar0234.c   **** static CyBool_t glTempSensorEnabled = CyFalse;
+  21:../ar0234.c   **** static CyBool_t glTempCalibrationValid = CyFalse;
+  22:../ar0234.c   **** static uint16_t glTempCalibSensor1 = 0;
+  23:../ar0234.c   **** static uint16_t glTempCalibSensor2 = 0;
+  24:../ar0234.c   **** 
+  25:../ar0234.c   **** static void AR0234_TxnInit(void)
+  26:../ar0234.c   **** {
+  57              		.loc 1 26 0
+  58              		.cfi_startproc
+  59              		@ args = 0, pretend = 0, frame = 0
+  60              		@ frame_needed = 1, uses_anonymous_args = 0
+  61 0000 00482DE9 		stmfd	sp!, {fp, lr}
+  62              	.LCFI0:
+  63              		.cfi_def_cfa_offset 8
+  64              		.cfi_offset 11, -8
+  65              		.cfi_offset 14, -4
+  66 0004 04B08DE2 		add	fp, sp, #4
+  67              	.LCFI1:
+  68              		.cfi_def_cfa 11, 4
+  27:../ar0234.c   **** 	if (!glAr0234TxnMutexReady)
+  69              		.loc 1 27 0
+  70 0008 38309FE5 		ldr	r3, .L3
+  71 000c 003093E5 		ldr	r3, [r3]
+  72 0010 000053E3 		cmp	r3, #0
+  73 0014 0A00001A 		bne	.L1
+  28:../ar0234.c   **** 	{
+  29:../ar0234.c   **** 		if (CyU3PMutexCreate(&glAr0234TxnMutex, CYU3P_NO_INHERIT) == CY_U3P_SUCCESS)
+  74              		.loc 1 29 0
+  75 0018 2C009FE5 		ldr	r0, .L3+4
+  76 001c 0010A0E3 		mov	r1, #0
+  77 0020 0020A0E3 		mov	r2, #0
+  78 0024 3830A0E3 		mov	r3, #56
+  79 0028 FEFFFFEB 		bl	_txe_mutex_create
+  80 002c 0030A0E1 		mov	r3, r0
+  81 0030 000053E3 		cmp	r3, #0
+  82 0034 0200001A 		bne	.L1
+  30:../ar0234.c   **** 		{
+  31:../ar0234.c   **** 			glAr0234TxnMutexReady = CyTrue;
+  83              		.loc 1 31 0
+  84 0038 08309FE5 		ldr	r3, .L3
+  85 003c 0120A0E3 		mov	r2, #1
+  86 0040 002083E5 		str	r2, [r3]
+  87              	.L1:
+  32:../ar0234.c   **** 		}
+  33:../ar0234.c   **** 	}
+  34:../ar0234.c   **** }
+  88              		.loc 1 34 0
+  89 0044 0088BDE8 		ldmfd	sp!, {fp, pc}
+  90              	.L4:
+  91              		.align	2
+  92              	.L3:
+  93 0048 3C000000 		.word	glAr0234TxnMutexReady
+  94 004c 04000000 		.word	glAr0234TxnMutex
+  95              		.cfi_endproc
+  96              	.LFE0:
+  98              		.align	2
+ 100              	AR0234_TxnLock:
+ 101              	.LFB1:
+  35:../ar0234.c   **** 
+  36:../ar0234.c   **** static void AR0234_TxnLock(void)
+  37:../ar0234.c   **** {
+ 102              		.loc 1 37 0
+ 103              		.cfi_startproc
+ 104              		@ args = 0, pretend = 0, frame = 0
+ 105              		@ frame_needed = 1, uses_anonymous_args = 0
+ 106 0050 00482DE9 		stmfd	sp!, {fp, lr}
+ 107              	.LCFI2:
+ 108              		.cfi_def_cfa_offset 8
+ 109              		.cfi_offset 11, -8
+ 110              		.cfi_offset 14, -4
+ 111 0054 04B08DE2 		add	fp, sp, #4
+ 112              	.LCFI3:
+ 113              		.cfi_def_cfa 11, 4
+  38:../ar0234.c   **** 	if (glAr0234TxnMutexReady)
+ 114              		.loc 1 38 0
+ 115 0058 18309FE5 		ldr	r3, .L7
+ 116 005c 003093E5 		ldr	r3, [r3]
+ 117 0060 000053E3 		cmp	r3, #0
+ 118 0064 0200000A 		beq	.L5
+  39:../ar0234.c   **** 	{
+  40:../ar0234.c   **** 		CyU3PMutexGet(&glAr0234TxnMutex, CYU3P_WAIT_FOREVER);
+ 119              		.loc 1 40 0
+ 120 0068 0C009FE5 		ldr	r0, .L7+4
+ 121 006c 0010E0E3 		mvn	r1, #0
+ 122 0070 FEFFFFEB 		bl	_txe_mutex_get
+ 123              	.L5:
+  41:../ar0234.c   **** 	}
+  42:../ar0234.c   **** }
+ 124              		.loc 1 42 0
+ 125 0074 0088BDE8 		ldmfd	sp!, {fp, pc}
+ 126              	.L8:
+ 127              		.align	2
+ 128              	.L7:
+ 129 0078 3C000000 		.word	glAr0234TxnMutexReady
+ 130 007c 04000000 		.word	glAr0234TxnMutex
+ 131              		.cfi_endproc
+ 132              	.LFE1:
+ 134              		.align	2
+ 136              	AR0234_TxnUnlock:
+ 137              	.LFB2:
+  43:../ar0234.c   **** 
+  44:../ar0234.c   **** static void AR0234_TxnUnlock(void)
+  45:../ar0234.c   **** {
+ 138              		.loc 1 45 0
+ 139              		.cfi_startproc
+ 140              		@ args = 0, pretend = 0, frame = 0
+ 141              		@ frame_needed = 1, uses_anonymous_args = 0
+ 142 0080 00482DE9 		stmfd	sp!, {fp, lr}
+ 143              	.LCFI4:
+ 144              		.cfi_def_cfa_offset 8
+ 145              		.cfi_offset 11, -8
+ 146              		.cfi_offset 14, -4
+ 147 0084 04B08DE2 		add	fp, sp, #4
+ 148              	.LCFI5:
+ 149              		.cfi_def_cfa 11, 4
+  46:../ar0234.c   **** 	if (glAr0234TxnMutexReady)
+ 150              		.loc 1 46 0
+ 151 0088 14309FE5 		ldr	r3, .L11
+ 152 008c 003093E5 		ldr	r3, [r3]
+ 153 0090 000053E3 		cmp	r3, #0
+ 154 0094 0100000A 		beq	.L9
+  47:../ar0234.c   **** 	{
+  48:../ar0234.c   **** 		CyU3PMutexPut(&glAr0234TxnMutex);
+ 155              		.loc 1 48 0
+ 156 0098 08009FE5 		ldr	r0, .L11+4
+ 157 009c FEFFFFEB 		bl	_txe_mutex_put
+ 158              	.L9:
+  49:../ar0234.c   **** 	}
+  50:../ar0234.c   **** }
+ 159              		.loc 1 50 0
+ 160 00a0 0088BDE8 		ldmfd	sp!, {fp, pc}
+ 161              	.L12:
+ 162              		.align	2
+ 163              	.L11:
+ 164 00a4 3C000000 		.word	glAr0234TxnMutexReady
+ 165 00a8 04000000 		.word	glAr0234TxnMutex
+ 166              		.cfi_endproc
+ 167              	.LFE2:
+ 169              		.align	2
+ 170              		.global	TemperatureMonitor_Start
+ 172              	TemperatureMonitor_Start:
+ 173              	.LFB3:
+  51:../ar0234.c   **** 
+  52:../ar0234.c   **** void TemperatureMonitor_Start(void)
+  53:../ar0234.c   **** {
+ 174              		.loc 1 53 0
+ 175              		.cfi_startproc
+ 176              		@ args = 0, pretend = 0, frame = 0
+ 177              		@ frame_needed = 1, uses_anonymous_args = 0
+ 178 00ac 00482DE9 		stmfd	sp!, {fp, lr}
+ 179              	.LCFI6:
+ 180              		.cfi_def_cfa_offset 8
+ 181              		.cfi_offset 11, -8
+ 182              		.cfi_offset 14, -4
+ 183 00b0 04B08DE2 		add	fp, sp, #4
+ 184              	.LCFI7:
+ 185              		.cfi_def_cfa 11, 4
+  54:../ar0234.c   **** 	AR0234_TxnInit();
+ 186              		.loc 1 54 0
+ 187 00b4 D1FFFFEB 		bl	AR0234_TxnInit
+  55:../ar0234.c   ****     glIsTempMonitorActive = CyTrue;
+ 188              		.loc 1 55 0
+ 189 00b8 08309FE5 		ldr	r3, .L14
+ 190 00bc 0120A0E3 		mov	r2, #1
+ 191 00c0 002083E5 		str	r2, [r3]
+  56:../ar0234.c   **** }
+ 192              		.loc 1 56 0
+ 193 00c4 0088BDE8 		ldmfd	sp!, {fp, pc}
+ 194              	.L15:
+ 195              		.align	2
+ 196              	.L14:
+ 197 00c8 00000000 		.word	glIsTempMonitorActive
+ 198              		.cfi_endproc
+ 199              	.LFE3:
+ 201              		.align	2
+ 202              		.global	CyFxUsbI2cTransfer_AR0234_WR
+ 204              	CyFxUsbI2cTransfer_AR0234_WR:
+ 205              	.LFB4:
+  57:../ar0234.c   **** 
+  58:../ar0234.c   **** // I2C写操作：向AR0234传感器写入寄存器配置
+  59:../ar0234.c   **** CyU3PReturnStatus_t CyFxUsbI2cTransfer_AR0234_WR (
+  60:../ar0234.c   ****         uint8_t   devAddr,// RGB传感器：0x20, MONO传感器：0x30
+  61:../ar0234.c   ****         uint16_t  regAddr,// 16位寄存器地址
+  62:../ar0234.c   ****         uint16_t  byteCount,// 数据字节数（固定为2字节）
+  63:../ar0234.c   ****         uint16_t  data1)// 16位配置数据
+  64:../ar0234.c   **** {
+ 206              		.loc 1 64 0
+ 207              		.cfi_startproc
+ 208              		@ args = 0, pretend = 0, frame = 32
+ 209              		@ frame_needed = 1, uses_anonymous_args = 0
+ 210 00cc 00482DE9 		stmfd	sp!, {fp, lr}
+ 211              	.LCFI8:
+ 212              		.cfi_def_cfa_offset 8
+ 213              		.cfi_offset 11, -8
+ 214              		.cfi_offset 14, -4
+ 215 00d0 04B08DE2 		add	fp, sp, #4
+ 216              	.LCFI9:
+ 217              		.cfi_def_cfa 11, 4
+ 218 00d4 20D04DE2 		sub	sp, sp, #32
+ 219 00d8 1D004BE5 		strb	r0, [fp, #-29]
+ 220 00dc B0124BE1 		strh	r1, [fp, #-32]	@ movhi
+ 221 00e0 B2224BE1 		strh	r2, [fp, #-34]	@ movhi
+ 222 00e4 B4324BE1 		strh	r3, [fp, #-36]	@ movhi
+  65:../ar0234.c   ****     CyU3PI2cPreamble_t preamble;
+  66:../ar0234.c   ****     CyU3PReturnStatus_t status = CY_U3P_SUCCESS;
+ 223              		.loc 1 66 0
+ 224 00e8 0030A0E3 		mov	r3, #0
+ 225 00ec 08300BE5 		str	r3, [fp, #-8]
+  67:../ar0234.c   ****     uint8_t  buffer[IIC_WR_AR0234_BYTES];
+  68:../ar0234.c   **** 
+  69:../ar0234.c   **** 	// 构造I2C数据包：[设备地址] [高位寄存器] [低位寄存器] [高位数据] [低位数据]
+  70:../ar0234.c   **** 	preamble.length    = 3;
+ 226              		.loc 1 70 0
+ 227 00f0 0330A0E3 		mov	r3, #3
+ 228 00f4 0C304BE5 		strb	r3, [fp, #-12]
+  71:../ar0234.c   **** 	preamble.buffer[0] = devAddr;
+ 229              		.loc 1 71 0
+ 230 00f8 1D305BE5 		ldrb	r3, [fp, #-29]
+ 231 00fc 14304BE5 		strb	r3, [fp, #-20]
+  72:../ar0234.c   **** 	preamble.buffer[1] = (uint8_t)(regAddr >> 8);
+ 232              		.loc 1 72 0
+ 233 0100 B0325BE1 		ldrh	r3, [fp, #-32]
+ 234 0104 2334A0E1 		mov	r3, r3, lsr #8
+ 235 0108 0338A0E1 		mov	r3, r3, asl #16
+ 236 010c 2338A0E1 		mov	r3, r3, lsr #16
+ 237 0110 FF3003E2 		and	r3, r3, #255
+ 238 0114 13304BE5 		strb	r3, [fp, #-19]
+  73:../ar0234.c   **** 	preamble.buffer[2] = (uint8_t)(regAddr);
+ 239              		.loc 1 73 0
+ 240 0118 B0325BE1 		ldrh	r3, [fp, #-32]	@ movhi
+ 241 011c FF3003E2 		and	r3, r3, #255
+ 242 0120 12304BE5 		strb	r3, [fp, #-18]
+  74:../ar0234.c   **** 	preamble.ctrlMask  = 0x0000;
+ 243              		.loc 1 74 0
+ 244 0124 0030A0E3 		mov	r3, #0
+ 245 0128 BA304BE1 		strh	r3, [fp, #-10]	@ movhi
+  75:../ar0234.c   **** 
+  76:../ar0234.c   **** 	buffer[0] = (uint8_t)(data1 >> 8);
+ 246              		.loc 1 76 0
+ 247 012c B4325BE1 		ldrh	r3, [fp, #-36]
+ 248 0130 2334A0E1 		mov	r3, r3, lsr #8
+ 249 0134 0338A0E1 		mov	r3, r3, asl #16
+ 250 0138 2338A0E1 		mov	r3, r3, lsr #16
+ 251 013c FF3003E2 		and	r3, r3, #255
+ 252 0140 18304BE5 		strb	r3, [fp, #-24]
+  77:../ar0234.c   **** 	buffer[1] = (uint8_t)data1;
+ 253              		.loc 1 77 0
+ 254 0144 B4325BE1 		ldrh	r3, [fp, #-36]	@ movhi
+ 255 0148 FF3003E2 		and	r3, r3, #255
+ 256 014c 17304BE5 		strb	r3, [fp, #-23]
+  78:../ar0234.c   **** 	status = CyU3PI2cTransmitBytes (&preamble, buffer, byteCount, 0);
+ 257              		.loc 1 78 0
+ 258 0150 B2325BE1 		ldrh	r3, [fp, #-34]
+ 259 0154 14104BE2 		sub	r1, fp, #20
+ 260 0158 18204BE2 		sub	r2, fp, #24
+ 261 015c 0100A0E1 		mov	r0, r1
+ 262 0160 0210A0E1 		mov	r1, r2
+ 263 0164 0320A0E1 		mov	r2, r3
+ 264 0168 0030A0E3 		mov	r3, #0
+ 265 016c FEFFFFEB 		bl	CyU3PI2cTransmitBytes
+ 266 0170 08000BE5 		str	r0, [fp, #-8]
+  79:../ar0234.c   **** 	if (status != CY_U3P_SUCCESS)
+ 267              		.loc 1 79 0
+ 268 0174 08301BE5 		ldr	r3, [fp, #-8]
+ 269 0178 000053E3 		cmp	r3, #0
+ 270 017c 0100000A 		beq	.L17
+  80:../ar0234.c   **** 	{
+  81:../ar0234.c   **** 		return status;
+ 271              		.loc 1 81 0
+ 272 0180 08301BE5 		ldr	r3, [fp, #-8]
+ 273 0184 000000EA 		b	.L19
+ 274              	.L17:
+  82:../ar0234.c   **** 	}
+  83:../ar0234.c   **** 
+  84:../ar0234.c   ****     return CY_U3P_SUCCESS;
+ 275              		.loc 1 84 0
+ 276 0188 0030A0E3 		mov	r3, #0
+ 277              	.L19:
+  85:../ar0234.c   **** }
+ 278              		.loc 1 85 0
+ 279 018c 0300A0E1 		mov	r0, r3
+ 280 0190 04D04BE2 		sub	sp, fp, #4
+ 281              		@ sp needed
+ 282 0194 0088BDE8 		ldmfd	sp!, {fp, pc}
+ 283              		.cfi_endproc
+ 284              	.LFE4:
+ 286              		.align	2
+ 287              		.global	CyFxUsbI2cTransfer_AR0234_RD
+ 289              	CyFxUsbI2cTransfer_AR0234_RD:
+ 290              	.LFB5:
+  86:../ar0234.c   **** 
+  87:../ar0234.c   **** /* I2C read mcu(ar0234) */
+  88:../ar0234.c   **** CyU3PReturnStatus_t
+  89:../ar0234.c   **** CyFxUsbI2cTransfer_AR0234_RD (
+  90:../ar0234.c   ****         uint8_t   devAddr,
+  91:../ar0234.c   ****         uint16_t  regAddr,
+  92:../ar0234.c   ****         uint16_t  byteCount,
+  93:../ar0234.c   ****         uint8_t   *buffer)
+  94:../ar0234.c   **** {
+ 291              		.loc 1 94 0
+ 292              		.cfi_startproc
+ 293              		@ args = 0, pretend = 0, frame = 32
+ 294              		@ frame_needed = 1, uses_anonymous_args = 0
+ 295 0198 00482DE9 		stmfd	sp!, {fp, lr}
+ 296              	.LCFI10:
+ 297              		.cfi_def_cfa_offset 8
+ 298              		.cfi_offset 11, -8
+ 299              		.cfi_offset 14, -4
+ 300 019c 04B08DE2 		add	fp, sp, #4
+ 301              	.LCFI11:
+ 302              		.cfi_def_cfa 11, 4
+ 303 01a0 20D04DE2 		sub	sp, sp, #32
+ 304 01a4 20300BE5 		str	r3, [fp, #-32]
+ 305 01a8 0030A0E1 		mov	r3, r0
+ 306 01ac 15304BE5 		strb	r3, [fp, #-21]
+ 307 01b0 B8114BE1 		strh	r1, [fp, #-24]	@ movhi
+ 308 01b4 BA214BE1 		strh	r2, [fp, #-26]	@ movhi
+  95:../ar0234.c   ****     CyU3PI2cPreamble_t preamble;
+  96:../ar0234.c   ****     CyU3PReturnStatus_t status = CY_U3P_SUCCESS;
+ 309              		.loc 1 96 0
+ 310 01b8 0030A0E3 		mov	r3, #0
+ 311 01bc 08300BE5 		str	r3, [fp, #-8]
+  97:../ar0234.c   **** 
+  98:../ar0234.c   **** 	/* Update the preamble information. */
+  99:../ar0234.c   **** 	preamble.length    = 4;
+ 312              		.loc 1 99 0
+ 313 01c0 0430A0E3 		mov	r3, #4
+ 314 01c4 0C304BE5 		strb	r3, [fp, #-12]
+ 100:../ar0234.c   **** 	preamble.buffer[0] = devAddr;
+ 315              		.loc 1 100 0
+ 316 01c8 15305BE5 		ldrb	r3, [fp, #-21]
+ 317 01cc 14304BE5 		strb	r3, [fp, #-20]
+ 101:../ar0234.c   **** 	preamble.buffer[1] = (uint8_t)(regAddr >> 8);
+ 318              		.loc 1 101 0
+ 319 01d0 B8315BE1 		ldrh	r3, [fp, #-24]
+ 320 01d4 2334A0E1 		mov	r3, r3, lsr #8
+ 321 01d8 0338A0E1 		mov	r3, r3, asl #16
+ 322 01dc 2338A0E1 		mov	r3, r3, lsr #16
+ 323 01e0 FF3003E2 		and	r3, r3, #255
+ 324 01e4 13304BE5 		strb	r3, [fp, #-19]
+ 102:../ar0234.c   **** 	preamble.buffer[2] = (uint8_t)(regAddr);
+ 325              		.loc 1 102 0
+ 326 01e8 B8315BE1 		ldrh	r3, [fp, #-24]	@ movhi
+ 327 01ec FF3003E2 		and	r3, r3, #255
+ 328 01f0 12304BE5 		strb	r3, [fp, #-18]
+ 103:../ar0234.c   **** 	preamble.buffer[3] = (devAddr | 0x01);
+ 329              		.loc 1 103 0
+ 330 01f4 15305BE5 		ldrb	r3, [fp, #-21]
+ 331 01f8 013083E3 		orr	r3, r3, #1
+ 332 01fc FF3003E2 		and	r3, r3, #255
+ 333 0200 11304BE5 		strb	r3, [fp, #-17]
+ 104:../ar0234.c   **** 	preamble.ctrlMask  = 0x0004;
+ 334              		.loc 1 104 0
+ 335 0204 0430A0E3 		mov	r3, #4
+ 336 0208 BA304BE1 		strh	r3, [fp, #-10]	@ movhi
+ 105:../ar0234.c   **** 
+ 106:../ar0234.c   **** 	status = CyU3PI2cReceiveBytes (&preamble, buffer, byteCount, 0);
+ 337              		.loc 1 106 0
+ 338 020c BA315BE1 		ldrh	r3, [fp, #-26]
+ 339 0210 14204BE2 		sub	r2, fp, #20
+ 340 0214 0200A0E1 		mov	r0, r2
+ 341 0218 20101BE5 		ldr	r1, [fp, #-32]
+ 342 021c 0320A0E1 		mov	r2, r3
+ 343 0220 0030A0E3 		mov	r3, #0
+ 344 0224 FEFFFFEB 		bl	CyU3PI2cReceiveBytes
+ 345 0228 08000BE5 		str	r0, [fp, #-8]
+ 107:../ar0234.c   **** 	if (status != CY_U3P_SUCCESS)
+ 346              		.loc 1 107 0
+ 347 022c 08301BE5 		ldr	r3, [fp, #-8]
+ 348 0230 000053E3 		cmp	r3, #0
+ 349 0234 0100000A 		beq	.L21
+ 108:../ar0234.c   **** 	{
+ 109:../ar0234.c   **** 		return status;
+ 350              		.loc 1 109 0
+ 351 0238 08301BE5 		ldr	r3, [fp, #-8]
+ 352 023c 000000EA 		b	.L23
+ 353              	.L21:
+ 110:../ar0234.c   **** 	}
+ 111:../ar0234.c   ****     return CY_U3P_SUCCESS;
+ 354              		.loc 1 111 0
+ 355 0240 0030A0E3 		mov	r3, #0
+ 356              	.L23:
+ 112:../ar0234.c   **** }
+ 357              		.loc 1 112 0
+ 358 0244 0300A0E1 		mov	r0, r3
+ 359 0248 04D04BE2 		sub	sp, fp, #4
+ 360              		@ sp needed
+ 361 024c 0088BDE8 		ldmfd	sp!, {fp, pc}
+ 362              		.cfi_endproc
+ 363              	.LFE5:
+ 365              		.align	2
+ 366              		.global	AR0234_Write_Sensor1
+ 368              	AR0234_Write_Sensor1:
+ 369              	.LFB6:
+ 113:../ar0234.c   **** 
+ 114:../ar0234.c   **** void AR0234_Write_Sensor1(uint16_t  regAddr,uint16_t  regData)
+ 115:../ar0234.c   **** {
+ 370              		.loc 1 115 0
+ 371              		.cfi_startproc
+ 372              		@ args = 0, pretend = 0, frame = 16
+ 373              		@ frame_needed = 1, uses_anonymous_args = 0
+ 374 0250 00482DE9 		stmfd	sp!, {fp, lr}
+ 375              	.LCFI12:
+ 376              		.cfi_def_cfa_offset 8
+ 377              		.cfi_offset 11, -8
+ 378              		.cfi_offset 14, -4
+ 379 0254 04B08DE2 		add	fp, sp, #4
+ 380              	.LCFI13:
+ 381              		.cfi_def_cfa 11, 4
+ 382 0258 10D04DE2 		sub	sp, sp, #16
+ 383 025c 0020A0E1 		mov	r2, r0
+ 384 0260 0130A0E1 		mov	r3, r1
+ 385 0264 BE204BE1 		strh	r2, [fp, #-14]	@ movhi
+ 386 0268 B0314BE1 		strh	r3, [fp, #-16]	@ movhi
+ 116:../ar0234.c   **** 	uint8_t registerAddrHigh,registerAddrLow;
+ 117:../ar0234.c   **** 	uint8_t registerDataHigh,registerDataLow;
+ 118:../ar0234.c   **** 
+ 119:../ar0234.c   **** 	registerAddrHigh = regAddr >> 8;
+ 387              		.loc 1 119 0
+ 388 026c BE305BE1 		ldrh	r3, [fp, #-14]
+ 389 0270 2334A0E1 		mov	r3, r3, lsr #8
+ 390 0274 0338A0E1 		mov	r3, r3, asl #16
+ 391 0278 2338A0E1 		mov	r3, r3, lsr #16
+ 392 027c 05304BE5 		strb	r3, [fp, #-5]
+ 120:../ar0234.c   **** 	registerAddrLow = regAddr;
+ 393              		.loc 1 120 0
+ 394 0280 BE305BE1 		ldrh	r3, [fp, #-14]	@ movhi
+ 395 0284 06304BE5 		strb	r3, [fp, #-6]
+ 121:../ar0234.c   **** 	registerDataHigh = regData >> 8;
+ 396              		.loc 1 121 0
+ 397 0288 B0315BE1 		ldrh	r3, [fp, #-16]
+ 398 028c 2334A0E1 		mov	r3, r3, lsr #8
+ 399 0290 0338A0E1 		mov	r3, r3, asl #16
+ 400 0294 2338A0E1 		mov	r3, r3, lsr #16
+ 401 0298 07304BE5 		strb	r3, [fp, #-7]
+ 122:../ar0234.c   **** 	registerDataLow = regData;
+ 402              		.loc 1 122 0
+ 403 029c B0315BE1 		ldrh	r3, [fp, #-16]	@ movhi
+ 404 02a0 08304BE5 		strb	r3, [fp, #-8]
+ 123:../ar0234.c   **** 
+ 124:../ar0234.c   **** 	AR0234_TxnLock();
+ 405              		.loc 1 124 0
+ 406 02a4 69FFFFEB 		bl	AR0234_TxnLock
+ 125:../ar0234.c   **** 
+ 126:../ar0234.c   **** 	FPGA_Write (0x01, 0x82, registerAddrHigh);
+ 407              		.loc 1 126 0
+ 408 02a8 05305BE5 		ldrb	r3, [fp, #-5]	@ zero_extendqisi2
+ 409 02ac 0100A0E3 		mov	r0, #1
+ 410 02b0 8210A0E3 		mov	r1, #130
+ 411 02b4 0320A0E1 		mov	r2, r3
+ 412 02b8 FEFFFFEB 		bl	FPGA_Write
+ 127:../ar0234.c   **** 	FPGA_Write (0x01, 0x83, registerAddrLow);
+ 413              		.loc 1 127 0
+ 414 02bc 06305BE5 		ldrb	r3, [fp, #-6]	@ zero_extendqisi2
+ 415 02c0 0100A0E3 		mov	r0, #1
+ 416 02c4 8310A0E3 		mov	r1, #131
+ 417 02c8 0320A0E1 		mov	r2, r3
+ 418 02cc FEFFFFEB 		bl	FPGA_Write
+ 128:../ar0234.c   **** 	FPGA_Write (0x01, 0x84, registerDataHigh);
+ 419              		.loc 1 128 0
+ 420 02d0 07305BE5 		ldrb	r3, [fp, #-7]	@ zero_extendqisi2
+ 421 02d4 0100A0E3 		mov	r0, #1
+ 422 02d8 8410A0E3 		mov	r1, #132
+ 423 02dc 0320A0E1 		mov	r2, r3
+ 424 02e0 FEFFFFEB 		bl	FPGA_Write
+ 129:../ar0234.c   **** 	FPGA_Write (0x01, 0x85, registerDataLow);
+ 425              		.loc 1 129 0
+ 426 02e4 08305BE5 		ldrb	r3, [fp, #-8]	@ zero_extendqisi2
+ 427 02e8 0100A0E3 		mov	r0, #1
+ 428 02ec 8510A0E3 		mov	r1, #133
+ 429 02f0 0320A0E1 		mov	r2, r3
+ 430 02f4 FEFFFFEB 		bl	FPGA_Write
+ 130:../ar0234.c   **** 	AR0234_TxnUnlock();
+ 431              		.loc 1 130 0
+ 432 02f8 60FFFFEB 		bl	AR0234_TxnUnlock
+ 131:../ar0234.c   **** //	FPGA_Write (0x01, 0x81, 0x01);
+ 132:../ar0234.c   **** //	FPGA_Write (0x01, 0x81, 0x00);
+ 133:../ar0234.c   **** 
+ 134:../ar0234.c   **** 	return;
+ 433              		.loc 1 134 0
+ 434 02fc 0000A0E1 		mov	r0, r0	@ nop
+ 135:../ar0234.c   **** }
+ 435              		.loc 1 135 0
+ 436 0300 04D04BE2 		sub	sp, fp, #4
+ 437              		@ sp needed
+ 438 0304 0088BDE8 		ldmfd	sp!, {fp, pc}
+ 439              		.cfi_endproc
+ 440              	.LFE6:
+ 442              		.align	2
+ 443              		.global	AR0234_read_sensor1
+ 445              	AR0234_read_sensor1:
+ 446              	.LFB7:
+ 136:../ar0234.c   **** 
+ 137:../ar0234.c   **** uint16_t AR0234_read_sensor1(uint16_t  regAddr)
+ 138:../ar0234.c   **** {
+ 447              		.loc 1 138 0
+ 448              		.cfi_startproc
+ 449              		@ args = 0, pretend = 0, frame = 16
+ 450              		@ frame_needed = 1, uses_anonymous_args = 0
+ 451 0308 00482DE9 		stmfd	sp!, {fp, lr}
+ 452              	.LCFI14:
+ 453              		.cfi_def_cfa_offset 8
+ 454              		.cfi_offset 11, -8
+ 455              		.cfi_offset 14, -4
+ 456 030c 04B08DE2 		add	fp, sp, #4
+ 457              	.LCFI15:
+ 458              		.cfi_def_cfa 11, 4
+ 459 0310 10D04DE2 		sub	sp, sp, #16
+ 460 0314 0030A0E1 		mov	r3, r0
+ 461 0318 BE304BE1 		strh	r3, [fp, #-14]	@ movhi
+ 139:../ar0234.c   **** 	uint8_t high_value;
+ 140:../ar0234.c   **** 	uint8_t low_value;
+ 141:../ar0234.c   **** 
+ 142:../ar0234.c   **** 	high_value = FPGA_Read(0x01, 0x82);
+ 462              		.loc 1 142 0
+ 463 031c 0100A0E3 		mov	r0, #1
+ 464 0320 8210A0E3 		mov	r1, #130
+ 465 0324 FEFFFFEB 		bl	FPGA_Read
+ 466 0328 0030A0E1 		mov	r3, r0
+ 467 032c 05304BE5 		strb	r3, [fp, #-5]
+ 143:../ar0234.c   **** 	low_value = FPGA_Read(0x01, 0x83);
+ 468              		.loc 1 143 0
+ 469 0330 0100A0E3 		mov	r0, #1
+ 470 0334 8310A0E3 		mov	r1, #131
+ 471 0338 FEFFFFEB 		bl	FPGA_Read
+ 472 033c 0030A0E1 		mov	r3, r0
+ 473 0340 06304BE5 		strb	r3, [fp, #-6]
+ 144:../ar0234.c   **** 	
+ 145:../ar0234.c   **** 	return (uint16_t)((high_value << 8) | low_value);
+ 474              		.loc 1 145 0
+ 475 0344 05305BE5 		ldrb	r3, [fp, #-5]	@ zero_extendqisi2
+ 476 0348 0334A0E1 		mov	r3, r3, asl #8
+ 477 034c 0338A0E1 		mov	r3, r3, asl #16
+ 478 0350 2328A0E1 		mov	r2, r3, lsr #16
+ 479 0354 06305BE5 		ldrb	r3, [fp, #-6]	@ zero_extendqisi2
+ 480 0358 0338A0E1 		mov	r3, r3, asl #16
+ 481 035c 2338A0E1 		mov	r3, r3, lsr #16
+ 482 0360 033082E1 		orr	r3, r2, r3
+ 483 0364 0338A0E1 		mov	r3, r3, asl #16
+ 484 0368 2338A0E1 		mov	r3, r3, lsr #16
+ 485 036c 0338A0E1 		mov	r3, r3, asl #16
+ 486 0370 2338A0E1 		mov	r3, r3, lsr #16
+ 146:../ar0234.c   **** }
+ 487              		.loc 1 146 0
+ 488 0374 0300A0E1 		mov	r0, r3
+ 489 0378 04D04BE2 		sub	sp, fp, #4
+ 490              		@ sp needed
+ 491 037c 0088BDE8 		ldmfd	sp!, {fp, pc}
+ 492              		.cfi_endproc
+ 493              	.LFE7:
+ 495              		.align	2
+ 496              		.global	AR0234_Write_Sensor2
+ 498              	AR0234_Write_Sensor2:
+ 499              	.LFB8:
+ 147:../ar0234.c   **** 
+ 148:../ar0234.c   **** void AR0234_Write_Sensor2(uint16_t  regAddr,uint16_t  regData)
+ 149:../ar0234.c   **** {
+ 500              		.loc 1 149 0
+ 501              		.cfi_startproc
+ 502              		@ args = 0, pretend = 0, frame = 16
+ 503              		@ frame_needed = 1, uses_anonymous_args = 0
+ 504 0380 00482DE9 		stmfd	sp!, {fp, lr}
+ 505              	.LCFI16:
+ 506              		.cfi_def_cfa_offset 8
+ 507              		.cfi_offset 11, -8
+ 508              		.cfi_offset 14, -4
+ 509 0384 04B08DE2 		add	fp, sp, #4
+ 510              	.LCFI17:
+ 511              		.cfi_def_cfa 11, 4
+ 512 0388 10D04DE2 		sub	sp, sp, #16
+ 513 038c 0020A0E1 		mov	r2, r0
+ 514 0390 0130A0E1 		mov	r3, r1
+ 515 0394 BE204BE1 		strh	r2, [fp, #-14]	@ movhi
+ 516 0398 B0314BE1 		strh	r3, [fp, #-16]	@ movhi
+ 150:../ar0234.c   **** 	uint8_t registerAddrHigh,registerAddrLow;
+ 151:../ar0234.c   **** 	uint8_t registerDataHigh,registerDataLow;
+ 152:../ar0234.c   **** 
+ 153:../ar0234.c   **** 	registerAddrHigh = regAddr >> 8;
+ 517              		.loc 1 153 0
+ 518 039c BE305BE1 		ldrh	r3, [fp, #-14]
+ 519 03a0 2334A0E1 		mov	r3, r3, lsr #8
+ 520 03a4 0338A0E1 		mov	r3, r3, asl #16
+ 521 03a8 2338A0E1 		mov	r3, r3, lsr #16
+ 522 03ac 05304BE5 		strb	r3, [fp, #-5]
+ 154:../ar0234.c   **** 	registerAddrLow = regAddr;
+ 523              		.loc 1 154 0
+ 524 03b0 BE305BE1 		ldrh	r3, [fp, #-14]	@ movhi
+ 525 03b4 06304BE5 		strb	r3, [fp, #-6]
+ 155:../ar0234.c   **** 	registerDataHigh = regData >> 8;
+ 526              		.loc 1 155 0
+ 527 03b8 B0315BE1 		ldrh	r3, [fp, #-16]
+ 528 03bc 2334A0E1 		mov	r3, r3, lsr #8
+ 529 03c0 0338A0E1 		mov	r3, r3, asl #16
+ 530 03c4 2338A0E1 		mov	r3, r3, lsr #16
+ 531 03c8 07304BE5 		strb	r3, [fp, #-7]
+ 156:../ar0234.c   **** 	registerDataLow = regData;
+ 532              		.loc 1 156 0
+ 533 03cc B0315BE1 		ldrh	r3, [fp, #-16]	@ movhi
+ 534 03d0 08304BE5 		strb	r3, [fp, #-8]
+ 157:../ar0234.c   **** 
+ 158:../ar0234.c   **** 	AR0234_TxnLock();
+ 535              		.loc 1 158 0
+ 536 03d4 1DFFFFEB 		bl	AR0234_TxnLock
+ 159:../ar0234.c   **** 
+ 160:../ar0234.c   **** 	FPGA_Write (0x01, 0x92, registerAddrHigh);
+ 537              		.loc 1 160 0
+ 538 03d8 05305BE5 		ldrb	r3, [fp, #-5]	@ zero_extendqisi2
+ 539 03dc 0100A0E3 		mov	r0, #1
+ 540 03e0 9210A0E3 		mov	r1, #146
+ 541 03e4 0320A0E1 		mov	r2, r3
+ 542 03e8 FEFFFFEB 		bl	FPGA_Write
+ 161:../ar0234.c   **** 	FPGA_Write (0x01, 0x93, registerAddrLow);
+ 543              		.loc 1 161 0
+ 544 03ec 06305BE5 		ldrb	r3, [fp, #-6]	@ zero_extendqisi2
+ 545 03f0 0100A0E3 		mov	r0, #1
+ 546 03f4 9310A0E3 		mov	r1, #147
+ 547 03f8 0320A0E1 		mov	r2, r3
+ 548 03fc FEFFFFEB 		bl	FPGA_Write
+ 162:../ar0234.c   **** 	FPGA_Write (0x01, 0x94, registerDataHigh);
+ 549              		.loc 1 162 0
+ 550 0400 07305BE5 		ldrb	r3, [fp, #-7]	@ zero_extendqisi2
+ 551 0404 0100A0E3 		mov	r0, #1
+ 552 0408 9410A0E3 		mov	r1, #148
+ 553 040c 0320A0E1 		mov	r2, r3
+ 554 0410 FEFFFFEB 		bl	FPGA_Write
+ 163:../ar0234.c   **** 	FPGA_Write (0x01, 0x95, registerDataLow);
+ 555              		.loc 1 163 0
+ 556 0414 08305BE5 		ldrb	r3, [fp, #-8]	@ zero_extendqisi2
+ 557 0418 0100A0E3 		mov	r0, #1
+ 558 041c 9510A0E3 		mov	r1, #149
+ 559 0420 0320A0E1 		mov	r2, r3
+ 560 0424 FEFFFFEB 		bl	FPGA_Write
+ 164:../ar0234.c   **** 	AR0234_TxnUnlock();
+ 561              		.loc 1 164 0
+ 562 0428 14FFFFEB 		bl	AR0234_TxnUnlock
+ 165:../ar0234.c   **** //	FPGA_Write (0x01, 0x91, 0x01);
+ 166:../ar0234.c   **** //	FPGA_Write (0x01, 0x91, 0x00);
+ 167:../ar0234.c   **** 
+ 168:../ar0234.c   **** 	return;
+ 563              		.loc 1 168 0
+ 564 042c 0000A0E1 		mov	r0, r0	@ nop
+ 169:../ar0234.c   **** }
+ 565              		.loc 1 169 0
+ 566 0430 04D04BE2 		sub	sp, fp, #4
+ 567              		@ sp needed
+ 568 0434 0088BDE8 		ldmfd	sp!, {fp, pc}
+ 569              		.cfi_endproc
+ 570              	.LFE8:
+ 572              		.align	2
+ 573              		.global	CyFxGetSensor1param
+ 575              	CyFxGetSensor1param:
+ 576              	.LFB9:
+ 170:../ar0234.c   **** 
+ 171:../ar0234.c   **** //读取第一路传感器寄存器参数
+ 172:../ar0234.c   **** uint16_t CyFxGetSensor1param(uint16_t sensoraddr)
+ 173:../ar0234.c   **** {
+ 577              		.loc 1 173 0
+ 578              		.cfi_startproc
+ 579              		@ args = 0, pretend = 0, frame = 16
+ 580              		@ frame_needed = 1, uses_anonymous_args = 0
+ 581 0438 00482DE9 		stmfd	sp!, {fp, lr}
+ 582              	.LCFI18:
+ 583              		.cfi_def_cfa_offset 8
+ 584              		.cfi_offset 11, -8
+ 585              		.cfi_offset 14, -4
+ 586 043c 04B08DE2 		add	fp, sp, #4
+ 587              	.LCFI19:
+ 588              		.cfi_def_cfa 11, 4
+ 589 0440 10D04DE2 		sub	sp, sp, #16
+ 590 0444 0030A0E1 		mov	r3, r0
+ 591 0448 BE304BE1 		strh	r3, [fp, #-14]	@ movhi
+ 174:../ar0234.c   **** 	uint8_t  dataHigh;
+ 175:../ar0234.c   **** 	uint8_t  dataLow;
+ 176:../ar0234.c   **** 	uint8_t  registerAddrHigh;
+ 177:../ar0234.c   **** 	uint8_t  registerAddrLow;
+ 178:../ar0234.c   **** 	uint16_t sensorparam = 0;
+ 592              		.loc 1 178 0
+ 593 044c 0030A0E3 		mov	r3, #0
+ 594 0450 B6304BE1 		strh	r3, [fp, #-6]	@ movhi
+ 179:../ar0234.c   **** 
+ 180:../ar0234.c   **** 	registerAddrHigh = (sensoraddr >> 8) & 0xFF;
+ 595              		.loc 1 180 0
+ 596 0454 BE305BE1 		ldrh	r3, [fp, #-14]
+ 597 0458 2334A0E1 		mov	r3, r3, lsr #8
+ 598 045c 0338A0E1 		mov	r3, r3, asl #16
+ 599 0460 2338A0E1 		mov	r3, r3, lsr #16
+ 600 0464 07304BE5 		strb	r3, [fp, #-7]
+ 181:../ar0234.c   **** 	registerAddrLow = sensoraddr & 0xFF;
+ 601              		.loc 1 181 0
+ 602 0468 BE305BE1 		ldrh	r3, [fp, #-14]	@ movhi
+ 603 046c 08304BE5 		strb	r3, [fp, #-8]
+ 182:../ar0234.c   **** 	AR0234_TxnLock();
+ 604              		.loc 1 182 0
+ 605 0470 F6FEFFEB 		bl	AR0234_TxnLock
+ 183:../ar0234.c   ****     FPGA_Write (0x01, 0x82, registerAddrHigh);
+ 606              		.loc 1 183 0
+ 607 0474 07305BE5 		ldrb	r3, [fp, #-7]	@ zero_extendqisi2
+ 608 0478 0100A0E3 		mov	r0, #1
+ 609 047c 8210A0E3 		mov	r1, #130
+ 610 0480 0320A0E1 		mov	r2, r3
+ 611 0484 FEFFFFEB 		bl	FPGA_Write
+ 184:../ar0234.c   **** 	FPGA_Write (0x01, 0x83, registerAddrLow);
+ 612              		.loc 1 184 0
+ 613 0488 08305BE5 		ldrb	r3, [fp, #-8]	@ zero_extendqisi2
+ 614 048c 0100A0E3 		mov	r0, #1
+ 615 0490 8310A0E3 		mov	r1, #131
+ 616 0494 0320A0E1 		mov	r2, r3
+ 617 0498 FEFFFFEB 		bl	FPGA_Write
+ 185:../ar0234.c   ****     FPGA_Write_Delay_1ms (0x01, 0x81, 0x22);
+ 618              		.loc 1 185 0
+ 619 049c 0100A0E3 		mov	r0, #1
+ 620 04a0 8110A0E3 		mov	r1, #129
+ 621 04a4 2220A0E3 		mov	r2, #34
+ 622 04a8 FEFFFFEB 		bl	FPGA_Write_Delay_1ms
+ 186:../ar0234.c   ****     FPGA_Write_Delay_1ms (0x01, 0x81, 0x00);
+ 623              		.loc 1 186 0
+ 624 04ac 0100A0E3 		mov	r0, #1
+ 625 04b0 8110A0E3 		mov	r1, #129
+ 626 04b4 0020A0E3 		mov	r2, #0
+ 627 04b8 FEFFFFEB 		bl	FPGA_Write_Delay_1ms
+ 187:../ar0234.c   **** 	CyU3PThreadSleep (50); 
+ 628              		.loc 1 187 0
+ 629 04bc 3200A0E3 		mov	r0, #50
+ 630 04c0 FEFFFFEB 		bl	_tx_thread_sleep
+ 188:../ar0234.c   **** 
+ 189:../ar0234.c   ****     FPGA_Write (0x02, 0xff, 0x01); 
+ 631              		.loc 1 189 0
+ 632 04c4 0200A0E3 		mov	r0, #2
+ 633 04c8 FF10A0E3 		mov	r1, #255
+ 634 04cc 0120A0E3 		mov	r2, #1
+ 635 04d0 FEFFFFEB 		bl	FPGA_Write
+ 190:../ar0234.c   **** 	CyU3PThreadSleep (15); 
+ 636              		.loc 1 190 0
+ 637 04d4 0F00A0E3 		mov	r0, #15
+ 638 04d8 FEFFFFEB 		bl	_tx_thread_sleep
+ 191:../ar0234.c   ****     dataHigh = FPGA_Read (0x00, 0x00);
+ 639              		.loc 1 191 0
+ 640 04dc 0000A0E3 		mov	r0, #0
+ 641 04e0 0010A0E3 		mov	r1, #0
+ 642 04e4 FEFFFFEB 		bl	FPGA_Read
+ 643 04e8 0030A0E1 		mov	r3, r0
+ 644 04ec 09304BE5 		strb	r3, [fp, #-9]
+ 192:../ar0234.c   **** 	CyU3PThreadSleep (15); 
+ 645              		.loc 1 192 0
+ 646 04f0 0F00A0E3 		mov	r0, #15
+ 647 04f4 FEFFFFEB 		bl	_tx_thread_sleep
+ 193:../ar0234.c   ****     FPGA_Write (0x02, 0xff, 0x02); 
+ 648              		.loc 1 193 0
+ 649 04f8 0200A0E3 		mov	r0, #2
+ 650 04fc FF10A0E3 		mov	r1, #255
+ 651 0500 0220A0E3 		mov	r2, #2
+ 652 0504 FEFFFFEB 		bl	FPGA_Write
+ 194:../ar0234.c   **** 	CyU3PThreadSleep (15); 
+ 653              		.loc 1 194 0
+ 654 0508 0F00A0E3 		mov	r0, #15
+ 655 050c FEFFFFEB 		bl	_tx_thread_sleep
+ 195:../ar0234.c   ****     dataLow = FPGA_Read (0x00, 0x00);
+ 656              		.loc 1 195 0
+ 657 0510 0000A0E3 		mov	r0, #0
+ 658 0514 0010A0E3 		mov	r1, #0
+ 659 0518 FEFFFFEB 		bl	FPGA_Read
+ 660 051c 0030A0E1 		mov	r3, r0
+ 661 0520 0A304BE5 		strb	r3, [fp, #-10]
+ 196:../ar0234.c   **** 	AR0234_TxnUnlock();
+ 662              		.loc 1 196 0
+ 663 0524 D5FEFFEB 		bl	AR0234_TxnUnlock
+ 197:../ar0234.c   **** 
+ 198:../ar0234.c   **** 	sensorparam = (dataHigh<<8)|dataLow;
+ 664              		.loc 1 198 0
+ 665 0528 09305BE5 		ldrb	r3, [fp, #-9]	@ zero_extendqisi2
+ 666 052c 0334A0E1 		mov	r3, r3, asl #8
+ 667 0530 0338A0E1 		mov	r3, r3, asl #16
+ 668 0534 2328A0E1 		mov	r2, r3, lsr #16
+ 669 0538 0A305BE5 		ldrb	r3, [fp, #-10]	@ zero_extendqisi2
+ 670 053c 0338A0E1 		mov	r3, r3, asl #16
+ 671 0540 2338A0E1 		mov	r3, r3, lsr #16
+ 672 0544 033082E1 		orr	r3, r2, r3
+ 673 0548 0338A0E1 		mov	r3, r3, asl #16
+ 674 054c 2338A0E1 		mov	r3, r3, lsr #16
+ 675 0550 B6304BE1 		strh	r3, [fp, #-6]	@ movhi
+ 199:../ar0234.c   **** 
+ 200:../ar0234.c   **** 	return sensorparam;
+ 676              		.loc 1 200 0
+ 677 0554 B6305BE1 		ldrh	r3, [fp, #-6]
+ 201:../ar0234.c   **** }
+ 678              		.loc 1 201 0
+ 679 0558 0300A0E1 		mov	r0, r3
+ 680 055c 04D04BE2 		sub	sp, fp, #4
+ 681              		@ sp needed
+ 682 0560 0088BDE8 		ldmfd	sp!, {fp, pc}
+ 683              		.cfi_endproc
+ 684              	.LFE9:
+ 686              		.align	2
+ 687              		.global	CyFxGetSensor2param
+ 689              	CyFxGetSensor2param:
+ 690              	.LFB10:
+ 202:../ar0234.c   **** 
+ 203:../ar0234.c   **** 
+ 204:../ar0234.c   **** //读取第二路传感器寄存器参数
+ 205:../ar0234.c   **** uint16_t CyFxGetSensor2param(uint16_t sensoraddr)
+ 206:../ar0234.c   **** {
+ 691              		.loc 1 206 0
+ 692              		.cfi_startproc
+ 693              		@ args = 0, pretend = 0, frame = 16
+ 694              		@ frame_needed = 1, uses_anonymous_args = 0
+ 695 0564 00482DE9 		stmfd	sp!, {fp, lr}
+ 696              	.LCFI20:
+ 697              		.cfi_def_cfa_offset 8
+ 698              		.cfi_offset 11, -8
+ 699              		.cfi_offset 14, -4
+ 700 0568 04B08DE2 		add	fp, sp, #4
+ 701              	.LCFI21:
+ 702              		.cfi_def_cfa 11, 4
+ 703 056c 10D04DE2 		sub	sp, sp, #16
+ 704 0570 0030A0E1 		mov	r3, r0
+ 705 0574 BE304BE1 		strh	r3, [fp, #-14]	@ movhi
+ 207:../ar0234.c   **** 	uint8_t  dataHigh;
+ 208:../ar0234.c   **** 	uint8_t  dataLow;
+ 209:../ar0234.c   **** 	uint8_t  registerAddrHigh;
+ 210:../ar0234.c   **** 	uint8_t  registerAddrLow;	
+ 211:../ar0234.c   **** 	uint16_t sensorparam;
+ 212:../ar0234.c   **** 
+ 213:../ar0234.c   **** 	registerAddrHigh = (sensoraddr >> 8) & 0xFF;
+ 706              		.loc 1 213 0
+ 707 0578 BE305BE1 		ldrh	r3, [fp, #-14]
+ 708 057c 2334A0E1 		mov	r3, r3, lsr #8
+ 709 0580 0338A0E1 		mov	r3, r3, asl #16
+ 710 0584 2338A0E1 		mov	r3, r3, lsr #16
+ 711 0588 05304BE5 		strb	r3, [fp, #-5]
+ 214:../ar0234.c   **** 	registerAddrLow = sensoraddr & 0xFF;
+ 712              		.loc 1 214 0
+ 713 058c BE305BE1 		ldrh	r3, [fp, #-14]	@ movhi
+ 714 0590 06304BE5 		strb	r3, [fp, #-6]
+ 215:../ar0234.c   **** 	AR0234_TxnLock();
+ 715              		.loc 1 215 0
+ 716 0594 ADFEFFEB 		bl	AR0234_TxnLock
+ 216:../ar0234.c   ****     FPGA_Write (0x01, 0x92, registerAddrHigh);
+ 717              		.loc 1 216 0
+ 718 0598 05305BE5 		ldrb	r3, [fp, #-5]	@ zero_extendqisi2
+ 719 059c 0100A0E3 		mov	r0, #1
+ 720 05a0 9210A0E3 		mov	r1, #146
+ 721 05a4 0320A0E1 		mov	r2, r3
+ 722 05a8 FEFFFFEB 		bl	FPGA_Write
+ 217:../ar0234.c   **** 	FPGA_Write (0x01, 0x93, registerAddrLow);
+ 723              		.loc 1 217 0
+ 724 05ac 06305BE5 		ldrb	r3, [fp, #-6]	@ zero_extendqisi2
+ 725 05b0 0100A0E3 		mov	r0, #1
+ 726 05b4 9310A0E3 		mov	r1, #147
+ 727 05b8 0320A0E1 		mov	r2, r3
+ 728 05bc FEFFFFEB 		bl	FPGA_Write
+ 218:../ar0234.c   ****     FPGA_Write_Delay_1ms (0x01, 0x81, 0x22);
+ 729              		.loc 1 218 0
+ 730 05c0 0100A0E3 		mov	r0, #1
+ 731 05c4 8110A0E3 		mov	r1, #129
+ 732 05c8 2220A0E3 		mov	r2, #34
+ 733 05cc FEFFFFEB 		bl	FPGA_Write_Delay_1ms
+ 219:../ar0234.c   ****     FPGA_Write_Delay_1ms (0x01, 0x81, 0x00);
+ 734              		.loc 1 219 0
+ 735 05d0 0100A0E3 		mov	r0, #1
+ 736 05d4 8110A0E3 		mov	r1, #129
+ 737 05d8 0020A0E3 		mov	r2, #0
+ 738 05dc FEFFFFEB 		bl	FPGA_Write_Delay_1ms
+ 220:../ar0234.c   **** 	CyU3PThreadSleep (50); 
+ 739              		.loc 1 220 0
+ 740 05e0 3200A0E3 		mov	r0, #50
+ 741 05e4 FEFFFFEB 		bl	_tx_thread_sleep
+ 221:../ar0234.c   **** 
+ 222:../ar0234.c   ****     FPGA_Write (0x02, 0xff, 0x03); 
+ 742              		.loc 1 222 0
+ 743 05e8 0200A0E3 		mov	r0, #2
+ 744 05ec FF10A0E3 		mov	r1, #255
+ 745 05f0 0320A0E3 		mov	r2, #3
+ 746 05f4 FEFFFFEB 		bl	FPGA_Write
+ 223:../ar0234.c   **** 	CyU3PThreadSleep (15); 
+ 747              		.loc 1 223 0
+ 748 05f8 0F00A0E3 		mov	r0, #15
+ 749 05fc FEFFFFEB 		bl	_tx_thread_sleep
+ 224:../ar0234.c   ****     dataHigh = FPGA_Read (0x00, 0x00);
+ 750              		.loc 1 224 0
+ 751 0600 0000A0E3 		mov	r0, #0
+ 752 0604 0010A0E3 		mov	r1, #0
+ 753 0608 FEFFFFEB 		bl	FPGA_Read
+ 754 060c 0030A0E1 		mov	r3, r0
+ 755 0610 07304BE5 		strb	r3, [fp, #-7]
+ 225:../ar0234.c   **** 	CyU3PThreadSleep (15); 
+ 756              		.loc 1 225 0
+ 757 0614 0F00A0E3 		mov	r0, #15
+ 758 0618 FEFFFFEB 		bl	_tx_thread_sleep
+ 226:../ar0234.c   ****     FPGA_Write (0x02, 0xff, 0x04); 
+ 759              		.loc 1 226 0
+ 760 061c 0200A0E3 		mov	r0, #2
+ 761 0620 FF10A0E3 		mov	r1, #255
+ 762 0624 0420A0E3 		mov	r2, #4
+ 763 0628 FEFFFFEB 		bl	FPGA_Write
+ 227:../ar0234.c   **** 	CyU3PThreadSleep (15); 
+ 764              		.loc 1 227 0
+ 765 062c 0F00A0E3 		mov	r0, #15
+ 766 0630 FEFFFFEB 		bl	_tx_thread_sleep
+ 228:../ar0234.c   ****     dataLow = FPGA_Read (0x00, 0x00);
+ 767              		.loc 1 228 0
+ 768 0634 0000A0E3 		mov	r0, #0
+ 769 0638 0010A0E3 		mov	r1, #0
+ 770 063c FEFFFFEB 		bl	FPGA_Read
+ 771 0640 0030A0E1 		mov	r3, r0
+ 772 0644 08304BE5 		strb	r3, [fp, #-8]
+ 229:../ar0234.c   **** 	AR0234_TxnUnlock();
+ 773              		.loc 1 229 0
+ 774 0648 8CFEFFEB 		bl	AR0234_TxnUnlock
+ 230:../ar0234.c   **** 
+ 231:../ar0234.c   **** 	sensorparam = (dataHigh<<8)|dataLow;
+ 775              		.loc 1 231 0
+ 776 064c 07305BE5 		ldrb	r3, [fp, #-7]	@ zero_extendqisi2
+ 777 0650 0334A0E1 		mov	r3, r3, asl #8
+ 778 0654 0338A0E1 		mov	r3, r3, asl #16
+ 779 0658 2328A0E1 		mov	r2, r3, lsr #16
+ 780 065c 08305BE5 		ldrb	r3, [fp, #-8]	@ zero_extendqisi2
+ 781 0660 0338A0E1 		mov	r3, r3, asl #16
+ 782 0664 2338A0E1 		mov	r3, r3, lsr #16
+ 783 0668 033082E1 		orr	r3, r2, r3
+ 784 066c 0338A0E1 		mov	r3, r3, asl #16
+ 785 0670 2338A0E1 		mov	r3, r3, lsr #16
+ 786 0674 BA304BE1 		strh	r3, [fp, #-10]	@ movhi
+ 232:../ar0234.c   **** 
+ 233:../ar0234.c   **** 	return sensorparam;
+ 787              		.loc 1 233 0
+ 788 0678 BA305BE1 		ldrh	r3, [fp, #-10]
+ 234:../ar0234.c   **** }
+ 789              		.loc 1 234 0
+ 790 067c 0300A0E1 		mov	r0, r3
+ 791 0680 04D04BE2 		sub	sp, fp, #4
+ 792              		@ sp needed
+ 793 0684 0088BDE8 		ldmfd	sp!, {fp, pc}
+ 794              		.cfi_endproc
+ 795              	.LFE10:
+ 797              		.section	.rodata
+ 798              		.align	2
+ 799              	.LC0:
+ 800 0000 54454D50 		.ascii	"TEMP sensor-enable\012\000"
+ 800      2073656E 
+ 800      736F722D 
+ 800      656E6162 
+ 800      6C650A00 
+ 801              		.text
+ 802              		.align	2
+ 803              		.global	TemperatureSensor_Enable
+ 805              	TemperatureSensor_Enable:
+ 806              	.LFB11:
+ 235:../ar0234.c   **** 
+ 236:../ar0234.c   **** /**
+ 237:../ar0234.c   ****  * 启用温度传感器
+ 238:../ar0234.c   ****  */
+ 239:../ar0234.c   **** void TemperatureSensor_Enable(void)
+ 240:../ar0234.c   **** {
+ 807              		.loc 1 240 0
+ 808              		.cfi_startproc
+ 809              		@ args = 0, pretend = 0, frame = 0
+ 810              		@ frame_needed = 1, uses_anonymous_args = 0
+ 811 0688 00482DE9 		stmfd	sp!, {fp, lr}
+ 812              	.LCFI22:
+ 813              		.cfi_def_cfa_offset 8
+ 814              		.cfi_offset 11, -8
+ 815              		.cfi_offset 14, -4
+ 816 068c 04B08DE2 		add	fp, sp, #4
+ 817              	.LCFI23:
+ 818              		.cfi_def_cfa 11, 4
+ 241:../ar0234.c   ****     // 写入 R0x30B4 [0] = 1 和 R0x30B4 [4] = 1
+ 242:../ar0234.c   ****     // 0x0011 = 0000 0000 0001 0001
+ 243:../ar0234.c   **** 	AR0234_Write_Sensor1(0x30B4, 0x0011);
+ 819              		.loc 1 243 0
+ 820 0690 40009FE5 		ldr	r0, .L35
+ 821 0694 1110A0E3 		mov	r1, #17
+ 822 0698 FEFFFFEB 		bl	AR0234_Write_Sensor1
+ 244:../ar0234.c   **** 	AR0234_Write_Sensor2(0x30B4, 0x0011);
+ 823              		.loc 1 244 0
+ 824 069c 34009FE5 		ldr	r0, .L35
+ 825 06a0 1110A0E3 		mov	r1, #17
+ 826 06a4 FEFFFFEB 		bl	AR0234_Write_Sensor2
+ 245:../ar0234.c   **** 	FPGA_Write_Delay_1ms (0x01, 0x81, 0x11);
+ 827              		.loc 1 245 0
+ 828 06a8 0100A0E3 		mov	r0, #1
+ 829 06ac 8110A0E3 		mov	r1, #129
+ 830 06b0 1120A0E3 		mov	r2, #17
+ 831 06b4 FEFFFFEB 		bl	FPGA_Write_Delay_1ms
+ 246:../ar0234.c   ****     FPGA_Write_Delay_1ms (0x01, 0x81, 0x00);
+ 832              		.loc 1 246 0
+ 833 06b8 0100A0E3 		mov	r0, #1
+ 834 06bc 8110A0E3 		mov	r1, #129
+ 835 06c0 0020A0E3 		mov	r2, #0
+ 836 06c4 FEFFFFEB 		bl	FPGA_Write_Delay_1ms
+ 247:../ar0234.c   **** 	#ifdef AR0234_DIAG_DEBUG
+ 248:../ar0234.c   **** 	CyU3PDebugPrint(4, "TEMP sensor-enable\n");
+ 837              		.loc 1 248 0
+ 838 06c8 0400A0E3 		mov	r0, #4
+ 839 06cc 08109FE5 		ldr	r1, .L35+4
+ 840 06d0 FEFFFFEB 		bl	CyU3PDebugPrint
+ 249:../ar0234.c   **** 	#endif
+ 250:../ar0234.c   **** }
+ 841              		.loc 1 250 0
+ 842 06d4 0088BDE8 		ldmfd	sp!, {fp, pc}
+ 843              	.L36:
+ 844              		.align	2
+ 845              	.L35:
+ 846 06d8 B4300000 		.word	12468
+ 847 06dc 00000000 		.word	.LC0
+ 848              		.cfi_endproc
+ 849              	.LFE11:
+ 851              		.section	.rodata
+ 852              		.align	2
+ 853              	.LC1:
+ 854 0014 54454D50 		.ascii	"TEMP calib-s1=%d\012\000"
+ 854      2063616C 
+ 854      69622D73 
+ 854      313D2564 
+ 854      0A00
+ 855 0026 0000     		.align	2
+ 856              	.LC2:
+ 857 0028 54454D50 		.ascii	"TEMP calib-s2=%d\012\000"
+ 857      2063616C 
+ 857      69622D73 
+ 857      323D2564 
+ 857      0A00
+ 858              		.text
+ 859              		.align	2
+ 860              		.global	TemperatureSensor_ReadCalibration
+ 862              	TemperatureSensor_ReadCalibration:
+ 863              	.LFB12:
+ 251:../ar0234.c   **** 
+ 252:../ar0234.c   **** /**
+ 253:../ar0234.c   ****  * 读取温度校准值 (R0x30C6 [9:0])
+ 254:../ar0234.c   ****  * @param pCalibSensor1: 指向传感器1校准值的指针（55°C时的ADC输出值，10位）
+ 255:../ar0234.c   ****  * @param pCalibSensor2: 指向传感器2校准值的指针（55°C时的ADC输出值，10位）
+ 256:../ar0234.c   ****  */
+ 257:../ar0234.c   **** void TemperatureSensor_ReadCalibration(uint16_t *pCalibSensor1, uint16_t *pCalibSensor2)
+ 258:../ar0234.c   **** {
+ 864              		.loc 1 258 0
+ 865              		.cfi_startproc
+ 866              		@ args = 0, pretend = 0, frame = 8
+ 867              		@ frame_needed = 1, uses_anonymous_args = 0
+ 868 06e0 00482DE9 		stmfd	sp!, {fp, lr}
+ 869              	.LCFI24:
+ 870              		.cfi_def_cfa_offset 8
+ 871              		.cfi_offset 11, -8
+ 872              		.cfi_offset 14, -4
+ 873 06e4 04B08DE2 		add	fp, sp, #4
+ 874              	.LCFI25:
+ 875              		.cfi_def_cfa 11, 4
+ 876 06e8 08D04DE2 		sub	sp, sp, #8
+ 877 06ec 08000BE5 		str	r0, [fp, #-8]
+ 878 06f0 0C100BE5 		str	r1, [fp, #-12]
+ 259:../ar0234.c   **** 	// 只取低10位 [9:0]
+ 260:../ar0234.c   ****     if (pCalibSensor1 != NULL)
+ 879              		.loc 1 260 0
+ 880 06f4 08301BE5 		ldr	r3, [fp, #-8]
+ 881 06f8 000053E3 		cmp	r3, #0
+ 882 06fc 0E00000A 		beq	.L38
+ 261:../ar0234.c   **** 	{
+ 262:../ar0234.c   **** 		*pCalibSensor1 = CyFxGetSensor1param(0x30C6) & 0x03FF;
+ 883              		.loc 1 262 0
+ 884 0700 84009FE5 		ldr	r0, .L40
+ 885 0704 FEFFFFEB 		bl	CyFxGetSensor1param
+ 886 0708 0030A0E1 		mov	r3, r0
+ 887 070c 033BA0E1 		mov	r3, r3, asl #22
+ 888 0710 233BA0E1 		mov	r3, r3, lsr #22
+ 889 0714 0338A0E1 		mov	r3, r3, asl #16
+ 890 0718 2328A0E1 		mov	r2, r3, lsr #16
+ 891 071c 08301BE5 		ldr	r3, [fp, #-8]
+ 892 0720 B020C3E1 		strh	r2, [r3]	@ movhi
+ 263:../ar0234.c   **** 		#ifdef AR0234_DIAG_DEBUG
+ 264:../ar0234.c   **** 		CyU3PDebugPrint(4, "TEMP calib-s1=%d\n", *pCalibSensor1);
+ 893              		.loc 1 264 0
+ 894 0724 08301BE5 		ldr	r3, [fp, #-8]
+ 895 0728 B030D3E1 		ldrh	r3, [r3]
+ 896 072c 0400A0E3 		mov	r0, #4
+ 897 0730 58109FE5 		ldr	r1, .L40+4
+ 898 0734 0320A0E1 		mov	r2, r3
+ 899 0738 FEFFFFEB 		bl	CyU3PDebugPrint
+ 900              	.L38:
+ 265:../ar0234.c   **** 		#endif
+ 266:../ar0234.c   **** 	}
+ 267:../ar0234.c   **** 	if (pCalibSensor2 != NULL)
+ 901              		.loc 1 267 0
+ 902 073c 0C301BE5 		ldr	r3, [fp, #-12]
+ 903 0740 000053E3 		cmp	r3, #0
+ 904 0744 0E00000A 		beq	.L37
+ 268:../ar0234.c   **** 	{
+ 269:../ar0234.c   **** 		*pCalibSensor2 = CyFxGetSensor2param(0x30C6) & 0x03FF;
+ 905              		.loc 1 269 0
+ 906 0748 3C009FE5 		ldr	r0, .L40
+ 907 074c FEFFFFEB 		bl	CyFxGetSensor2param
+ 908 0750 0030A0E1 		mov	r3, r0
+ 909 0754 033BA0E1 		mov	r3, r3, asl #22
+ 910 0758 233BA0E1 		mov	r3, r3, lsr #22
+ 911 075c 0338A0E1 		mov	r3, r3, asl #16
+ 912 0760 2328A0E1 		mov	r2, r3, lsr #16
+ 913 0764 0C301BE5 		ldr	r3, [fp, #-12]
+ 914 0768 B020C3E1 		strh	r2, [r3]	@ movhi
+ 270:../ar0234.c   **** 		#ifdef AR0234_DIAG_DEBUG
+ 271:../ar0234.c   **** 		CyU3PDebugPrint(4, "TEMP calib-s2=%d\n", *pCalibSensor2);
+ 915              		.loc 1 271 0
+ 916 076c 0C301BE5 		ldr	r3, [fp, #-12]
+ 917 0770 B030D3E1 		ldrh	r3, [r3]
+ 918 0774 0400A0E3 		mov	r0, #4
+ 919 0778 14109FE5 		ldr	r1, .L40+8
+ 920 077c 0320A0E1 		mov	r2, r3
+ 921 0780 FEFFFFEB 		bl	CyU3PDebugPrint
+ 922              	.L37:
+ 272:../ar0234.c   **** 		#endif
+ 273:../ar0234.c   **** 	}
+ 274:../ar0234.c   **** }
+ 923              		.loc 1 274 0
+ 924 0784 04D04BE2 		sub	sp, fp, #4
+ 925              		@ sp needed
+ 926 0788 0088BDE8 		ldmfd	sp!, {fp, pc}
+ 927              	.L41:
+ 928              		.align	2
+ 929              	.L40:
+ 930 078c C6300000 		.word	12486
+ 931 0790 14000000 		.word	.LC1
+ 932 0794 28000000 		.word	.LC2
+ 933              		.cfi_endproc
+ 934              	.LFE12:
+ 936              		.section	.rodata
+ 937 003a 0000     		.align	2
+ 938              	.LC3:
+ 939 003c 54454D50 		.ascii	"TEMP raw-s1=%d\012\000"
+ 939      20726177 
+ 939      2D73313D 
+ 939      25640A00 
+ 940              		.align	2
+ 941              	.LC4:
+ 942 004c 54454D50 		.ascii	"TEMP raw-s2=%d\012\000"
+ 942      20726177 
+ 942      2D73323D 
+ 942      25640A00 
+ 943              		.text
+ 944              		.align	2
+ 945              		.global	TemperatureSensor_ReadRawValue
+ 947              	TemperatureSensor_ReadRawValue:
+ 948              	.LFB13:
+ 275:../ar0234.c   **** 
+ 276:../ar0234.c   **** 
+ 277:../ar0234.c   **** 
+ 278:../ar0234.c   **** /**
+ 279:../ar0234.c   ****  * 读取温度传感器原始值 (R0x30B2 [9:0])
+ 280:../ar0234.c   ****  * @param pTempSensor1: 指向传感器1温度原始值的指针（当前温度ADC输出值，10位）
+ 281:../ar0234.c   ****  * @param pTempSensor2: 指向传感器2温度原始值的指针（当前温度ADC输出值，10位）
+ 282:../ar0234.c   ****  */
+ 283:../ar0234.c   **** void TemperatureSensor_ReadRawValue(uint16_t *pTempSensor1, uint16_t *pTempSensor2)
+ 284:../ar0234.c   **** {
+ 949              		.loc 1 284 0
+ 950              		.cfi_startproc
+ 951              		@ args = 0, pretend = 0, frame = 8
+ 952              		@ frame_needed = 1, uses_anonymous_args = 0
+ 953 0798 00482DE9 		stmfd	sp!, {fp, lr}
+ 954              	.LCFI26:
+ 955              		.cfi_def_cfa_offset 8
+ 956              		.cfi_offset 11, -8
+ 957              		.cfi_offset 14, -4
+ 958 079c 04B08DE2 		add	fp, sp, #4
+ 959              	.LCFI27:
+ 960              		.cfi_def_cfa 11, 4
+ 961 07a0 08D04DE2 		sub	sp, sp, #8
+ 962 07a4 08000BE5 		str	r0, [fp, #-8]
+ 963 07a8 0C100BE5 		str	r1, [fp, #-12]
+ 285:../ar0234.c   **** 	// 只取低10位 [9:0]
+ 286:../ar0234.c   ****     if (pTempSensor1 != NULL)
+ 964              		.loc 1 286 0
+ 965 07ac 08301BE5 		ldr	r3, [fp, #-8]
+ 966 07b0 000053E3 		cmp	r3, #0
+ 967 07b4 0E00000A 		beq	.L43
+ 287:../ar0234.c   **** 	{
+ 288:../ar0234.c   **** 		*pTempSensor1 = CyFxGetSensor1param(0x30B2) & 0x03FF;
+ 968              		.loc 1 288 0
+ 969 07b8 84009FE5 		ldr	r0, .L45
+ 970 07bc FEFFFFEB 		bl	CyFxGetSensor1param
+ 971 07c0 0030A0E1 		mov	r3, r0
+ 972 07c4 033BA0E1 		mov	r3, r3, asl #22
+ 973 07c8 233BA0E1 		mov	r3, r3, lsr #22
+ 974 07cc 0338A0E1 		mov	r3, r3, asl #16
+ 975 07d0 2328A0E1 		mov	r2, r3, lsr #16
+ 976 07d4 08301BE5 		ldr	r3, [fp, #-8]
+ 977 07d8 B020C3E1 		strh	r2, [r3]	@ movhi
+ 289:../ar0234.c   **** 		#ifdef AR0234_DIAG_DEBUG
+ 290:../ar0234.c   **** 		CyU3PDebugPrint(4, "TEMP raw-s1=%d\n", *pTempSensor1);
+ 978              		.loc 1 290 0
+ 979 07dc 08301BE5 		ldr	r3, [fp, #-8]
+ 980 07e0 B030D3E1 		ldrh	r3, [r3]
+ 981 07e4 0400A0E3 		mov	r0, #4
+ 982 07e8 58109FE5 		ldr	r1, .L45+4
+ 983 07ec 0320A0E1 		mov	r2, r3
+ 984 07f0 FEFFFFEB 		bl	CyU3PDebugPrint
+ 985              	.L43:
+ 291:../ar0234.c   **** 		#endif
+ 292:../ar0234.c   **** 	}
+ 293:../ar0234.c   **** 	if (pTempSensor2 != NULL)
+ 986              		.loc 1 293 0
+ 987 07f4 0C301BE5 		ldr	r3, [fp, #-12]
+ 988 07f8 000053E3 		cmp	r3, #0
+ 989 07fc 0E00000A 		beq	.L42
+ 294:../ar0234.c   **** 	{
+ 295:../ar0234.c   **** 		*pTempSensor2 = CyFxGetSensor2param(0x30B2) & 0x03FF;
+ 990              		.loc 1 295 0
+ 991 0800 3C009FE5 		ldr	r0, .L45
+ 992 0804 FEFFFFEB 		bl	CyFxGetSensor2param
+ 993 0808 0030A0E1 		mov	r3, r0
+ 994 080c 033BA0E1 		mov	r3, r3, asl #22
+ 995 0810 233BA0E1 		mov	r3, r3, lsr #22
+ 996 0814 0338A0E1 		mov	r3, r3, asl #16
+ 997 0818 2328A0E1 		mov	r2, r3, lsr #16
+ 998 081c 0C301BE5 		ldr	r3, [fp, #-12]
+ 999 0820 B020C3E1 		strh	r2, [r3]	@ movhi
+ 296:../ar0234.c   **** 		#ifdef AR0234_DIAG_DEBUG
+ 297:../ar0234.c   **** 		CyU3PDebugPrint(4, "TEMP raw-s2=%d\n", *pTempSensor2);
+ 1000              		.loc 1 297 0
+ 1001 0824 0C301BE5 		ldr	r3, [fp, #-12]
+ 1002 0828 B030D3E1 		ldrh	r3, [r3]
+ 1003 082c 0400A0E3 		mov	r0, #4
+ 1004 0830 14109FE5 		ldr	r1, .L45+8
+ 1005 0834 0320A0E1 		mov	r2, r3
+ 1006 0838 FEFFFFEB 		bl	CyU3PDebugPrint
+ 1007              	.L42:
+ 298:../ar0234.c   **** 		#endif
+ 299:../ar0234.c   **** 	}
+ 300:../ar0234.c   **** }
+ 1008              		.loc 1 300 0
+ 1009 083c 04D04BE2 		sub	sp, fp, #4
+ 1010              		@ sp needed
+ 1011 0840 0088BDE8 		ldmfd	sp!, {fp, pc}
+ 1012              	.L46:
+ 1013              		.align	2
+ 1014              	.L45:
+ 1015 0844 B2300000 		.word	12466
+ 1016 0848 3C000000 		.word	.LC3
+ 1017 084c 4C000000 		.word	.LC4
+ 1018              		.cfi_endproc
+ 1019              	.LFE13:
+ 1021              		.global	__aeabi_ui2f
+ 1022              		.global	__aeabi_fsub
+ 1023              		.global	__aeabi_fmul
+ 1024              		.global	__aeabi_fadd
+ 1025              		.align	2
+ 1026              		.global	TemperatureSensor_CalculateTemperature
+ 1028              	TemperatureSensor_CalculateTemperature:
+ 1029              	.LFB14:
+ 301:../ar0234.c   **** 
+ 302:../ar0234.c   **** /**
+ 303:../ar0234.c   ****  * 计算温度值（摄氏度）
+ 304:../ar0234.c   ****  * 公式：温度 = 0.7 × (R0x30B2[9:0] - R0x30C6[9:0]) + 55
+ 305:../ar0234.c   ****  * 
+ 306:../ar0234.c   ****  * @param rawValue: 当前温度原始值 (R0x30B2[9:0])
+ 307:../ar0234.c   ****  * @param calibValue: 校准值 (R0x30C6[9:0])
+ 308:../ar0234.c   ****  * @return: 温度值（摄氏度）
+ 309:../ar0234.c   ****  */
+ 310:../ar0234.c   **** float TemperatureSensor_CalculateTemperature(uint16_t rawValue, uint16_t calibValue)
+ 311:../ar0234.c   **** {
+ 1030              		.loc 1 311 0
+ 1031              		.cfi_startproc
+ 1032              		@ args = 0, pretend = 0, frame = 16
+ 1033              		@ frame_needed = 1, uses_anonymous_args = 0
+ 1034 0850 10482DE9 		stmfd	sp!, {r4, fp, lr}
+ 1035              	.LCFI28:
+ 1036              		.cfi_def_cfa_offset 12
+ 1037              		.cfi_offset 4, -12
+ 1038              		.cfi_offset 11, -8
+ 1039              		.cfi_offset 14, -4
+ 1040 0854 08B08DE2 		add	fp, sp, #8
+ 1041              	.LCFI29:
+ 1042              		.cfi_def_cfa 11, 4
+ 1043 0858 14D04DE2 		sub	sp, sp, #20
+ 1044 085c 0020A0E1 		mov	r2, r0
+ 1045 0860 0130A0E1 		mov	r3, r1
+ 1046 0864 B6214BE1 		strh	r2, [fp, #-22]	@ movhi
+ 1047 0868 B8314BE1 		strh	r3, [fp, #-24]	@ movhi
+ 312:../ar0234.c   ****     // 温度 = 0.7 × (当前值 - 校准值) + 55
+ 313:../ar0234.c   ****     float temperature = 0.7f * ((float)rawValue - (float)calibValue) + 55.0f;
+ 1048              		.loc 1 313 0
+ 1049 086c B6315BE1 		ldrh	r3, [fp, #-22]
+ 1050 0870 0300A0E1 		mov	r0, r3
+ 1051 0874 FEFFFFEB 		bl	__aeabi_ui2f
+ 1052 0878 0040A0E1 		mov	r4, r0
+ 1053 087c B8315BE1 		ldrh	r3, [fp, #-24]
+ 1054 0880 0300A0E1 		mov	r0, r3
+ 1055 0884 FEFFFFEB 		bl	__aeabi_ui2f
+ 1056 0888 0030A0E1 		mov	r3, r0
+ 1057 088c 0400A0E1 		mov	r0, r4
+ 1058 0890 0310A0E1 		mov	r1, r3
+ 1059 0894 FEFFFFEB 		bl	__aeabi_fsub
+ 1060 0898 0030A0E1 		mov	r3, r0
+ 1061 089c 0300A0E1 		mov	r0, r3
+ 1062 08a0 28109FE5 		ldr	r1, .L49
+ 1063 08a4 FEFFFFEB 		bl	__aeabi_fmul
+ 1064 08a8 0030A0E1 		mov	r3, r0
+ 1065 08ac 0300A0E1 		mov	r0, r3
+ 1066 08b0 1C109FE5 		ldr	r1, .L49+4
+ 1067 08b4 FEFFFFEB 		bl	__aeabi_fadd
+ 1068 08b8 0030A0E1 		mov	r3, r0
+ 1069 08bc 10300BE5 		str	r3, [fp, #-16]	@ float
+ 314:../ar0234.c   ****     return temperature;
+ 1070              		.loc 1 314 0
+ 1071 08c0 10301BE5 		ldr	r3, [fp, #-16]	@ float
+ 315:../ar0234.c   **** }
+ 1072              		.loc 1 315 0
+ 1073 08c4 0300A0E1 		mov	r0, r3
+ 1074 08c8 08D04BE2 		sub	sp, fp, #8
+ 1075              		@ sp needed
+ 1076 08cc 1088BDE8 		ldmfd	sp!, {r4, fp, pc}
+ 1077              	.L50:
+ 1078              		.align	2
+ 1079              	.L49:
+ 1080 08d0 3333333F 		.word	1060320051
+ 1081 08d4 00005C42 		.word	1113325568
+ 1082              		.cfi_endproc
+ 1083              	.LFE14:
+ 1085              		.global	__aeabi_f2iz
+ 1086              		.section	.rodata
+ 1087              		.align	2
+ 1088              	.LC5:
+ 1089 005c 54454D50 		.ascii	"TEMP calc-s1=%dC\012\000"
+ 1089      2063616C 
+ 1089      632D7331 
+ 1089      3D256443 
+ 1089      0A00
+ 1090 006e 0000     		.align	2
+ 1091              	.LC6:
+ 1092 0070 54454D50 		.ascii	"TEMP calc-s2=%dC\012\000"
+ 1092      2063616C 
+ 1092      632D7332 
+ 1092      3D256443 
+ 1092      0A00
+ 1093 0082 0000     		.align	2
+ 1094              	.LC7:
+ 1095 0084 54454D50 		.ascii	"TEMP read-ms=%d\012\000"
+ 1095      20726561 
+ 1095      642D6D73 
+ 1095      3D25640A 
+ 1095      00
+ 1096              		.text
+ 1097              		.align	2
+ 1098              		.global	TemperatureSensor_ReadTemperature
+ 1100              	TemperatureSensor_ReadTemperature:
+ 1101              	.LFB15:
+ 316:../ar0234.c   **** 
+ 317:../ar0234.c   **** 
+ 318:../ar0234.c   **** /**
+ 319:../ar0234.c   ****  * 读取两个传感器的温度值
+ 320:../ar0234.c   ****  * @param pTempSensor1: 指向传感器1温度值的指针（摄氏度）
+ 321:../ar0234.c   ****  * @param pTempSensor2: 指向传感器2温度值的指针（摄氏度）
+ 322:../ar0234.c   ****  */
+ 323:../ar0234.c   **** void TemperatureSensor_ReadTemperature(float *pTempSensor1, float *pTempSensor2)
+ 324:../ar0234.c   **** {
+ 1102              		.loc 1 324 0
+ 1103              		.cfi_startproc
+ 1104              		@ args = 0, pretend = 0, frame = 16
+ 1105              		@ frame_needed = 1, uses_anonymous_args = 0
+ 1106 08d8 00482DE9 		stmfd	sp!, {fp, lr}
+ 1107              	.LCFI30:
+ 1108              		.cfi_def_cfa_offset 8
+ 1109              		.cfi_offset 11, -8
+ 1110              		.cfi_offset 14, -4
+ 1111 08dc 04B08DE2 		add	fp, sp, #4
+ 1112              	.LCFI31:
+ 1113              		.cfi_def_cfa 11, 4
+ 1114 08e0 10D04DE2 		sub	sp, sp, #16
+ 1115 08e4 10000BE5 		str	r0, [fp, #-16]
+ 1116 08e8 14100BE5 		str	r1, [fp, #-20]
+ 325:../ar0234.c   ****     uint16_t rawValue1, rawValue2;
+ 326:../ar0234.c   **** 	uint32_t tStart = CyU3PGetTime();
+ 1117              		.loc 1 326 0
+ 1118 08ec FEFFFFEB 		bl	_tx_time_get
+ 1119 08f0 08000BE5 		str	r0, [fp, #-8]
+ 327:../ar0234.c   ****     
+ 328:../ar0234.c   **** 	// 仅首次使能一次温度传感器。
+ 329:../ar0234.c   **** 	if (!glTempSensorEnabled)
+ 1120              		.loc 1 329 0
+ 1121 08f4 2C319FE5 		ldr	r3, .L56
+ 1122 08f8 003093E5 		ldr	r3, [r3]
+ 1123 08fc 000053E3 		cmp	r3, #0
+ 1124 0900 0500001A 		bne	.L52
+ 330:../ar0234.c   **** 	{
+ 331:../ar0234.c   **** 		TemperatureSensor_Enable();
+ 1125              		.loc 1 331 0
+ 1126 0904 FEFFFFEB 		bl	TemperatureSensor_Enable
+ 332:../ar0234.c   **** 		CyU3PThreadSleep(5);
+ 1127              		.loc 1 332 0
+ 1128 0908 0500A0E3 		mov	r0, #5
+ 1129 090c FEFFFFEB 		bl	_tx_thread_sleep
+ 333:../ar0234.c   **** 		glTempSensorEnabled = CyTrue;
+ 1130              		.loc 1 333 0
+ 1131 0910 10319FE5 		ldr	r3, .L56
+ 1132 0914 0120A0E3 		mov	r2, #1
+ 1133 0918 002083E5 		str	r2, [r3]
+ 1134              	.L52:
+ 334:../ar0234.c   **** 	}
+ 335:../ar0234.c   **** 
+ 336:../ar0234.c   **** 	// 仅首次读取校准值，后续复用缓存。
+ 337:../ar0234.c   **** 	if (!glTempCalibrationValid)
+ 1135              		.loc 1 337 0
+ 1136 091c 08319FE5 		ldr	r3, .L56+4
+ 1137 0920 003093E5 		ldr	r3, [r3]
+ 1138 0924 000053E3 		cmp	r3, #0
+ 1139 0928 0500001A 		bne	.L53
+ 338:../ar0234.c   **** 	{
+ 339:../ar0234.c   **** 		TemperatureSensor_ReadCalibration(&glTempCalibSensor1, &glTempCalibSensor2);
+ 1140              		.loc 1 339 0
+ 1141 092c FC009FE5 		ldr	r0, .L56+8
+ 1142 0930 FC109FE5 		ldr	r1, .L56+12
+ 1143 0934 FEFFFFEB 		bl	TemperatureSensor_ReadCalibration
+ 340:../ar0234.c   **** 		glTempCalibrationValid = CyTrue;
+ 1144              		.loc 1 340 0
+ 1145 0938 EC309FE5 		ldr	r3, .L56+4
+ 1146 093c 0120A0E3 		mov	r2, #1
+ 1147 0940 002083E5 		str	r2, [r3]
+ 1148              	.L53:
+ 341:../ar0234.c   **** 	}
+ 342:../ar0234.c   ****     
+ 343:../ar0234.c   ****     // 读取当前温度原始值
+ 344:../ar0234.c   ****     TemperatureSensor_ReadRawValue(&rawValue1, &rawValue2);
+ 1149              		.loc 1 344 0
+ 1150 0944 0A204BE2 		sub	r2, fp, #10
+ 1151 0948 0C304BE2 		sub	r3, fp, #12
+ 1152 094c 0200A0E1 		mov	r0, r2
+ 1153 0950 0310A0E1 		mov	r1, r3
+ 1154 0954 FEFFFFEB 		bl	TemperatureSensor_ReadRawValue
+ 345:../ar0234.c   ****     
+ 346:../ar0234.c   ****     // 计算温度
+ 347:../ar0234.c   **** 	if (pTempSensor1 != NULL)
+ 1155              		.loc 1 347 0
+ 1156 0958 10301BE5 		ldr	r3, [fp, #-16]
+ 1157 095c 000053E3 		cmp	r3, #0
+ 1158 0960 1100000A 		beq	.L54
+ 348:../ar0234.c   **** 	{
+ 349:../ar0234.c   **** 		*pTempSensor1 = TemperatureSensor_CalculateTemperature(rawValue1, glTempCalibSensor1);
+ 1159              		.loc 1 349 0
+ 1160 0964 BA205BE1 		ldrh	r2, [fp, #-10]
+ 1161 0968 C0309FE5 		ldr	r3, .L56+8
+ 1162 096c B030D3E1 		ldrh	r3, [r3]
+ 1163 0970 0200A0E1 		mov	r0, r2
+ 1164 0974 0310A0E1 		mov	r1, r3
+ 1165 0978 FEFFFFEB 		bl	TemperatureSensor_CalculateTemperature
+ 1166 097c 0020A0E1 		mov	r2, r0
+ 1167 0980 10301BE5 		ldr	r3, [fp, #-16]
+ 1168 0984 002083E5 		str	r2, [r3]	@ float
+ 350:../ar0234.c   **** 		#ifdef AR0234_DIAG_DEBUG
+ 351:../ar0234.c   **** 		CyU3PDebugPrint(4, "TEMP calc-s1=%dC\n", (int)(*pTempSensor1));
+ 1169              		.loc 1 351 0
+ 1170 0988 10301BE5 		ldr	r3, [fp, #-16]
+ 1171 098c 003093E5 		ldr	r3, [r3]	@ float
+ 1172 0990 0300A0E1 		mov	r0, r3
+ 1173 0994 FEFFFFEB 		bl	__aeabi_f2iz
+ 1174 0998 0030A0E1 		mov	r3, r0
+ 1175 099c 0400A0E3 		mov	r0, #4
+ 1176 09a0 90109FE5 		ldr	r1, .L56+16
+ 1177 09a4 0320A0E1 		mov	r2, r3
+ 1178 09a8 FEFFFFEB 		bl	CyU3PDebugPrint
+ 1179              	.L54:
+ 352:../ar0234.c   **** 		#endif
+ 353:../ar0234.c   **** 	}
+ 354:../ar0234.c   **** 	if (pTempSensor2 != NULL)
+ 1180              		.loc 1 354 0
+ 1181 09ac 14301BE5 		ldr	r3, [fp, #-20]
+ 1182 09b0 000053E3 		cmp	r3, #0
+ 1183 09b4 1100000A 		beq	.L55
+ 355:../ar0234.c   **** 	{
+ 356:../ar0234.c   **** 		*pTempSensor2 = TemperatureSensor_CalculateTemperature(rawValue2, glTempCalibSensor2);
+ 1184              		.loc 1 356 0
+ 1185 09b8 BC205BE1 		ldrh	r2, [fp, #-12]
+ 1186 09bc 70309FE5 		ldr	r3, .L56+12
+ 1187 09c0 B030D3E1 		ldrh	r3, [r3]
+ 1188 09c4 0200A0E1 		mov	r0, r2
+ 1189 09c8 0310A0E1 		mov	r1, r3
+ 1190 09cc FEFFFFEB 		bl	TemperatureSensor_CalculateTemperature
+ 1191 09d0 0020A0E1 		mov	r2, r0
+ 1192 09d4 14301BE5 		ldr	r3, [fp, #-20]
+ 1193 09d8 002083E5 		str	r2, [r3]	@ float
+ 357:../ar0234.c   **** 		#ifdef AR0234_DIAG_DEBUG
+ 358:../ar0234.c   **** 		CyU3PDebugPrint(4, "TEMP calc-s2=%dC\n", (int)(*pTempSensor2));
+ 1194              		.loc 1 358 0
+ 1195 09dc 14301BE5 		ldr	r3, [fp, #-20]
+ 1196 09e0 003093E5 		ldr	r3, [r3]	@ float
+ 1197 09e4 0300A0E1 		mov	r0, r3
+ 1198 09e8 FEFFFFEB 		bl	__aeabi_f2iz
+ 1199 09ec 0030A0E1 		mov	r3, r0
+ 1200 09f0 0400A0E3 		mov	r0, #4
+ 1201 09f4 40109FE5 		ldr	r1, .L56+20
+ 1202 09f8 0320A0E1 		mov	r2, r3
+ 1203 09fc FEFFFFEB 		bl	CyU3PDebugPrint
+ 1204              	.L55:
+ 359:../ar0234.c   **** 		#endif
+ 360:../ar0234.c   **** 	}
+ 361:../ar0234.c   **** 
+ 362:../ar0234.c   **** 	#ifdef AR0234_DIAG_DEBUG
+ 363:../ar0234.c   **** 	CyU3PDebugPrint(4, "TEMP read-ms=%d\n", (int)(CyU3PGetTime() - tStart));
+ 1205              		.loc 1 363 0
+ 1206 0a00 FEFFFFEB 		bl	_tx_time_get
+ 1207 0a04 0020A0E1 		mov	r2, r0
+ 1208 0a08 08301BE5 		ldr	r3, [fp, #-8]
+ 1209 0a0c 023063E0 		rsb	r3, r3, r2
+ 1210 0a10 0400A0E3 		mov	r0, #4
+ 1211 0a14 24109FE5 		ldr	r1, .L56+24
+ 1212 0a18 0320A0E1 		mov	r2, r3
+ 1213 0a1c FEFFFFEB 		bl	CyU3PDebugPrint
+ 364:../ar0234.c   **** 	#endif
+ 365:../ar0234.c   **** }
+ 1214              		.loc 1 365 0
+ 1215 0a20 04D04BE2 		sub	sp, fp, #4
+ 1216              		@ sp needed
+ 1217 0a24 0088BDE8 		ldmfd	sp!, {fp, pc}
+ 1218              	.L57:
+ 1219              		.align	2
+ 1220              	.L56:
+ 1221 0a28 40000000 		.word	glTempSensorEnabled
+ 1222 0a2c 44000000 		.word	glTempCalibrationValid
+ 1223 0a30 48000000 		.word	glTempCalibSensor1
+ 1224 0a34 4A000000 		.word	glTempCalibSensor2
+ 1225 0a38 5C000000 		.word	.LC5
+ 1226 0a3c 70000000 		.word	.LC6
+ 1227 0a40 84000000 		.word	.LC7
+ 1228              		.cfi_endproc
+ 1229              	.LFE15:
+ 1231              		.align	2
+ 1232              		.global	TemperatureMonitor_GetLastTemperature
+ 1234              	TemperatureMonitor_GetLastTemperature:
+ 1235              	.LFB16:
+ 366:../ar0234.c   **** 
+ 367:../ar0234.c   **** 
+ 368:../ar0234.c   **** /**
+ 369:../ar0234.c   ****  * 获取上次读取的温度值（不重新读取传感器）
+ 370:../ar0234.c   ****  * @param pTempSensor1: 指向传感器1温度值的指针
+ 371:../ar0234.c   ****  * @param pTempSensor2: 指向传感器2温度值的指针
+ 372:../ar0234.c   ****  */
+ 373:../ar0234.c   **** void TemperatureMonitor_GetLastTemperature(float *pTempSensor1, float *pTempSensor2)
+ 374:../ar0234.c   **** {
+ 1236              		.loc 1 374 0
+ 1237              		.cfi_startproc
+ 1238              		@ args = 0, pretend = 0, frame = 8
+ 1239              		@ frame_needed = 1, uses_anonymous_args = 0
+ 1240              		@ link register save eliminated.
+ 1241 0a44 04B02DE5 		str	fp, [sp, #-4]!
+ 1242              	.LCFI32:
+ 1243              		.cfi_def_cfa_offset 4
+ 1244              		.cfi_offset 11, -4
+ 1245 0a48 00B08DE2 		add	fp, sp, #0
+ 1246              	.LCFI33:
+ 1247              		.cfi_def_cfa_register 11
+ 1248 0a4c 0CD04DE2 		sub	sp, sp, #12
+ 1249 0a50 08000BE5 		str	r0, [fp, #-8]
+ 1250 0a54 0C100BE5 		str	r1, [fp, #-12]
+ 375:../ar0234.c   ****     if (pTempSensor1 != NULL)
+ 1251              		.loc 1 375 0
+ 1252 0a58 08301BE5 		ldr	r3, [fp, #-8]
+ 1253 0a5c 000053E3 		cmp	r3, #0
+ 1254 0a60 0300000A 		beq	.L59
+ 376:../ar0234.c   ****     {
+ 377:../ar0234.c   ****         *pTempSensor1 = glLastTempSensor1;
+ 1255              		.loc 1 377 0
+ 1256 0a64 30309FE5 		ldr	r3, .L61
+ 1257 0a68 002093E5 		ldr	r2, [r3]	@ float
+ 1258 0a6c 08301BE5 		ldr	r3, [fp, #-8]
+ 1259 0a70 002083E5 		str	r2, [r3]	@ float
+ 1260              	.L59:
+ 378:../ar0234.c   ****     }
+ 379:../ar0234.c   ****     if (pTempSensor2 != NULL)
+ 1261              		.loc 1 379 0
+ 1262 0a74 0C301BE5 		ldr	r3, [fp, #-12]
+ 1263 0a78 000053E3 		cmp	r3, #0
+ 1264 0a7c 0300000A 		beq	.L58
+ 380:../ar0234.c   ****     {
+ 381:../ar0234.c   ****         *pTempSensor2 = glLastTempSensor2;
+ 1265              		.loc 1 381 0
+ 1266 0a80 18309FE5 		ldr	r3, .L61+4
+ 1267 0a84 002093E5 		ldr	r2, [r3]	@ float
+ 1268 0a88 0C301BE5 		ldr	r3, [fp, #-12]
+ 1269 0a8c 002083E5 		str	r2, [r3]	@ float
+ 1270              	.L58:
+ 382:../ar0234.c   ****     }
+ 383:../ar0234.c   **** }
+ 1271              		.loc 1 383 0
+ 1272 0a90 00D04BE2 		sub	sp, fp, #0
+ 1273              		@ sp needed
+ 1274 0a94 04B09DE4 		ldr	fp, [sp], #4
+ 1275 0a98 1EFF2FE1 		bx	lr
+ 1276              	.L62:
+ 1277              		.align	2
+ 1278              	.L61:
+ 1279 0a9c 00000000 		.word	glLastTempSensor1
+ 1280 0aa0 04000000 		.word	glLastTempSensor2
+ 1281              		.cfi_endproc
+ 1282              	.LFE16:
+ 1284              		.section	.rodata
+ 1285 0095 000000   		.align	2
+ 1286              	.LC8:
+ 1287 0098 54454D50 		.ascii	"TEMP result s1=%dC s2=%dC\012\000"
+ 1287      20726573 
+ 1287      756C7420 
+ 1287      73313D25 
+ 1287      64432073 
+ 1288              		.text
+ 1289              		.align	2
+ 1290              		.global	TemperatureMonitor_Process
+ 1292              	TemperatureMonitor_Process:
+ 1293              	.LFB17:
+ 384:../ar0234.c   **** 
+ 385:../ar0234.c   **** /**
+ 386:../ar0234.c   ****  * 温度读取函数
+ 387:../ar0234.c   ****  * 每次调用就读取一次（立即读取，无10秒定时与触发标志）。
+ 388:../ar0234.c   ****  */
+ 389:../ar0234.c   **** void TemperatureMonitor_Process(void)
+ 390:../ar0234.c   **** {
+ 1294              		.loc 1 390 0
+ 1295              		.cfi_startproc
+ 1296              		@ args = 0, pretend = 0, frame = 8
+ 1297              		@ frame_needed = 1, uses_anonymous_args = 0
+ 1298 0aa4 10482DE9 		stmfd	sp!, {r4, fp, lr}
+ 1299              	.LCFI34:
+ 1300              		.cfi_def_cfa_offset 12
+ 1301              		.cfi_offset 4, -12
+ 1302              		.cfi_offset 11, -8
+ 1303              		.cfi_offset 14, -4
+ 1304 0aa8 08B08DE2 		add	fp, sp, #8
+ 1305              	.LCFI35:
+ 1306              		.cfi_def_cfa 11, 4
+ 1307 0aac 0CD04DE2 		sub	sp, sp, #12
+ 391:../ar0234.c   **** 	if (!glIsTempMonitorActive)
+ 1308              		.loc 1 391 0
+ 1309 0ab0 6C309FE5 		ldr	r3, .L66
+ 1310 0ab4 003093E5 		ldr	r3, [r3]
+ 1311 0ab8 000053E3 		cmp	r3, #0
+ 1312 0abc 1600000A 		beq	.L63
+ 392:../ar0234.c   **** 	{
+ 393:../ar0234.c   **** 		return;
+ 394:../ar0234.c   **** 	}
+ 395:../ar0234.c   **** 
+ 396:../ar0234.c   ****     float temp1, temp2;
+ 397:../ar0234.c   ****     TemperatureSensor_ReadTemperature(&temp1, &temp2);
+ 1313              		.loc 1 397 0
+ 1314 0ac0 10204BE2 		sub	r2, fp, #16
+ 1315 0ac4 14304BE2 		sub	r3, fp, #20
+ 1316 0ac8 0200A0E1 		mov	r0, r2
+ 1317 0acc 0310A0E1 		mov	r1, r3
+ 1318 0ad0 FEFFFFEB 		bl	TemperatureSensor_ReadTemperature
+ 398:../ar0234.c   **** 
+ 399:../ar0234.c   ****     // 保存温度值
+ 400:../ar0234.c   ****     glLastTempSensor1 = temp1;
+ 1319              		.loc 1 400 0
+ 1320 0ad4 10201BE5 		ldr	r2, [fp, #-16]	@ float
+ 1321 0ad8 48309FE5 		ldr	r3, .L66+4
+ 1322 0adc 002083E5 		str	r2, [r3]	@ float
+ 401:../ar0234.c   ****     glLastTempSensor2 = temp2;
+ 1323              		.loc 1 401 0
+ 1324 0ae0 14201BE5 		ldr	r2, [fp, #-20]	@ float
+ 1325 0ae4 40309FE5 		ldr	r3, .L66+8
+ 1326 0ae8 002083E5 		str	r2, [r3]	@ float
+ 402:../ar0234.c   **** 
+ 403:../ar0234.c   ****     // 调试输出
+ 404:../ar0234.c   ****     #ifdef AR0234_DIAG_DEBUG
+ 405:../ar0234.c   **** 	CyU3PDebugPrint(4, "TEMP result s1=%dC s2=%dC\n", (int)temp1, (int)temp2);
+ 1327              		.loc 1 405 0
+ 1328 0aec 10301BE5 		ldr	r3, [fp, #-16]	@ float
+ 1329 0af0 0300A0E1 		mov	r0, r3
+ 1330 0af4 FEFFFFEB 		bl	__aeabi_f2iz
+ 1331 0af8 0040A0E1 		mov	r4, r0
+ 1332 0afc 14301BE5 		ldr	r3, [fp, #-20]	@ float
+ 1333 0b00 0300A0E1 		mov	r0, r3
+ 1334 0b04 FEFFFFEB 		bl	__aeabi_f2iz
+ 1335 0b08 0030A0E1 		mov	r3, r0
+ 1336 0b0c 0400A0E3 		mov	r0, #4
+ 1337 0b10 18109FE5 		ldr	r1, .L66+12
+ 1338 0b14 0420A0E1 		mov	r2, r4
+ 1339 0b18 FEFFFFEB 		bl	CyU3PDebugPrint
+ 1340              	.L63:
+ 406:../ar0234.c   ****     #endif
+ 407:../ar0234.c   **** }
+ 1341              		.loc 1 407 0
+ 1342 0b1c 08D04BE2 		sub	sp, fp, #8
+ 1343              		@ sp needed
+ 1344 0b20 1088BDE8 		ldmfd	sp!, {r4, fp, pc}
+ 1345              	.L67:
+ 1346              		.align	2
+ 1347              	.L66:
+ 1348 0b24 00000000 		.word	glIsTempMonitorActive
+ 1349 0b28 00000000 		.word	glLastTempSensor1
+ 1350 0b2c 04000000 		.word	glLastTempSensor2
+ 1351 0b30 98000000 		.word	.LC8
+ 1352              		.cfi_endproc
+ 1353              	.LFE17:
+ 1355              		.section	.rodata
+ 1356 00b3 00       		.align	2
+ 1357              	.LC9:
+ 1358 00b4 52454720 		.ascii	"REG read reg=0x30B0 s1=%d\012\000"
+ 1358      72656164 
+ 1358      20726567 
+ 1358      3D307833 
+ 1358      30423020 
+ 1359 00cf 00       		.align	2
+ 1360              	.LC10:
+ 1361 00d0 52454720 		.ascii	"REG read reg=0x30B0 s2=%d\012\000"
+ 1361      72656164 
+ 1361      20726567 
+ 1361      3D307833 
+ 1361      30423020 
+ 1362 00eb 00       		.align	2
+ 1363              	.LC11:
+ 1364 00ec 52454720 		.ascii	"REG read reg=0x30A2 s1=%d\012\000"
+ 1364      72656164 
+ 1364      20726567 
+ 1364      3D307833 
+ 1364      30413220 
+ 1365 0107 00       		.align	2
+ 1366              	.LC12:
+ 1367 0108 52454720 		.ascii	"REG read reg=0x30A2 s2=%d\012\000"
+ 1367      72656164 
+ 1367      20726567 
+ 1367      3D307833 
+ 1367      30413220 
+ 1368 0123 00       		.align	2
+ 1369              	.LC13:
+ 1370 0124 52454720 		.ascii	"REG read reg=0x30A6 s1=%d\012\000"
+ 1370      72656164 
+ 1370      20726567 
+ 1370      3D307833 
+ 1370      30413620 
+ 1371 013f 00       		.align	2
+ 1372              	.LC14:
+ 1373 0140 52454720 		.ascii	"REG read reg=0x30A6 s2=%d\012\000"
+ 1373      72656164 
+ 1373      20726567 
+ 1373      3D307833 
+ 1373      30413620 
+ 1374 015b 00       		.align	2
+ 1375              	.LC15:
+ 1376 015c 52454720 		.ascii	"REG read reg=0x3040 s1=%d\012\000"
+ 1376      72656164 
+ 1376      20726567 
+ 1376      3D307833 
+ 1376      30343020 
+ 1377 0177 00       		.align	2
+ 1378              	.LC16:
+ 1379 0178 52454720 		.ascii	"REG read reg=0x3040 s2=%d\012\000"
+ 1379      72656164 
+ 1379      20726567 
+ 1379      3D307833 
+ 1379      30343020 
+ 1380 0193 00       		.align	2
+ 1381              	.LC17:
+ 1382 0194 52454720 		.ascii	"REG read reg=0x30AE s1=%d\012\000"
+ 1382      72656164 
+ 1382      20726567 
+ 1382      3D307833 
+ 1382      30414520 
+ 1383 01af 00       		.align	2
+ 1384              	.LC18:
+ 1385 01b0 52454720 		.ascii	"REG read reg=0x30AE s2=%d\012\000"
+ 1385      72656164 
+ 1385      20726567 
+ 1385      3D307833 
+ 1385      30414520 
+ 1386 01cb 00       		.align	2
+ 1387              	.LC19:
+ 1388 01cc 52454720 		.ascii	"REG read reg=0x30A8 s1=%d\012\000"
+ 1388      72656164 
+ 1388      20726567 
+ 1388      3D307833 
+ 1388      30413820 
+ 1389 01e7 00       		.align	2
+ 1390              	.LC20:
+ 1391 01e8 52454720 		.ascii	"REG read reg=0x30A8 s2=%d\012\000"
+ 1391      72656164 
+ 1391      20726567 
+ 1391      3D307833 
+ 1391      30413820 
+ 1392 0203 00       		.text
+ 1393              		.align	2
+ 1394              		.global	AR0234_DumpCoreModeRegisters_Sequential100ms
+ 1396              	AR0234_DumpCoreModeRegisters_Sequential100ms:
+ 1397              	.LFB18:
+ 408:../ar0234.c   **** 
+ 409:../ar0234.c   **** 
+ 410:../ar0234.c   **** //读取AR0234核心模式寄存器
+ 411:../ar0234.c   **** void AR0234_DumpCoreModeRegisters_Sequential100ms(void)
+ 412:../ar0234.c   **** {
+ 1398              		.loc 1 412 0
+ 1399              		.cfi_startproc
+ 1400              		@ args = 0, pretend = 0, frame = 8
+ 1401              		@ frame_needed = 1, uses_anonymous_args = 0
+ 1402 0b34 00482DE9 		stmfd	sp!, {fp, lr}
+ 1403              	.LCFI36:
+ 1404              		.cfi_def_cfa_offset 8
+ 1405              		.cfi_offset 11, -8
+ 1406              		.cfi_offset 14, -4
+ 1407 0b38 04B08DE2 		add	fp, sp, #4
+ 1408              	.LCFI37:
+ 1409              		.cfi_def_cfa 11, 4
+ 1410 0b3c 08D04DE2 		sub	sp, sp, #8
+ 413:../ar0234.c   **** 	uint16_t s1, s2;
+ 414:../ar0234.c   **** 	/* 0x30B0 */
+ 415:../ar0234.c   **** 	s1 = CyFxGetSensor1param(0x30B0); s2 = CyFxGetSensor2param(0x30B0);
+ 1411              		.loc 1 415 0
+ 1412 0b40 D8019FE5 		ldr	r0, .L69
+ 1413 0b44 FEFFFFEB 		bl	CyFxGetSensor1param
+ 1414 0b48 0030A0E1 		mov	r3, r0
+ 1415 0b4c B6304BE1 		strh	r3, [fp, #-6]	@ movhi
+ 1416 0b50 C8019FE5 		ldr	r0, .L69
+ 1417 0b54 FEFFFFEB 		bl	CyFxGetSensor2param
+ 1418 0b58 0030A0E1 		mov	r3, r0
+ 1419 0b5c B8304BE1 		strh	r3, [fp, #-8]	@ movhi
+ 416:../ar0234.c   **** 	#ifdef AR0234_DIAG_DEBUG
+ 417:../ar0234.c   **** 	CyU3PDebugPrint(4, "REG read reg=0x30B0 s1=%d\n", s1);
+ 1420              		.loc 1 417 0
+ 1421 0b60 B6305BE1 		ldrh	r3, [fp, #-6]
+ 1422 0b64 0400A0E3 		mov	r0, #4
+ 1423 0b68 B4119FE5 		ldr	r1, .L69+4
+ 1424 0b6c 0320A0E1 		mov	r2, r3
+ 1425 0b70 FEFFFFEB 		bl	CyU3PDebugPrint
+ 418:../ar0234.c   **** 	CyU3PDebugPrint(4, "REG read reg=0x30B0 s2=%d\n", s2);
+ 1426              		.loc 1 418 0
+ 1427 0b74 B8305BE1 		ldrh	r3, [fp, #-8]
+ 1428 0b78 0400A0E3 		mov	r0, #4
+ 1429 0b7c A4119FE5 		ldr	r1, .L69+8
+ 1430 0b80 0320A0E1 		mov	r2, r3
+ 1431 0b84 FEFFFFEB 		bl	CyU3PDebugPrint
+ 419:../ar0234.c   **** 	#endif
+ 420:../ar0234.c   **** 	CyU3PThreadSleep(100);
+ 1432              		.loc 1 420 0
+ 1433 0b88 6400A0E3 		mov	r0, #100
+ 1434 0b8c FEFFFFEB 		bl	_tx_thread_sleep
+ 421:../ar0234.c   **** 	/* 0x30A2 */
+ 422:../ar0234.c   **** 	s1 = CyFxGetSensor1param(0x30A2); s2 = CyFxGetSensor2param(0x30A2);
+ 1435              		.loc 1 422 0
+ 1436 0b90 94019FE5 		ldr	r0, .L69+12
+ 1437 0b94 FEFFFFEB 		bl	CyFxGetSensor1param
+ 1438 0b98 0030A0E1 		mov	r3, r0
+ 1439 0b9c B6304BE1 		strh	r3, [fp, #-6]	@ movhi
+ 1440 0ba0 84019FE5 		ldr	r0, .L69+12
+ 1441 0ba4 FEFFFFEB 		bl	CyFxGetSensor2param
+ 1442 0ba8 0030A0E1 		mov	r3, r0
+ 1443 0bac B8304BE1 		strh	r3, [fp, #-8]	@ movhi
+ 423:../ar0234.c   **** 	#ifdef AR0234_DIAG_DEBUG
+ 424:../ar0234.c   **** 	CyU3PDebugPrint(4, "REG read reg=0x30A2 s1=%d\n", s1);
+ 1444              		.loc 1 424 0
+ 1445 0bb0 B6305BE1 		ldrh	r3, [fp, #-6]
+ 1446 0bb4 0400A0E3 		mov	r0, #4
+ 1447 0bb8 70119FE5 		ldr	r1, .L69+16
+ 1448 0bbc 0320A0E1 		mov	r2, r3
+ 1449 0bc0 FEFFFFEB 		bl	CyU3PDebugPrint
+ 425:../ar0234.c   **** 	CyU3PDebugPrint(4, "REG read reg=0x30A2 s2=%d\n", s2);
+ 1450              		.loc 1 425 0
+ 1451 0bc4 B8305BE1 		ldrh	r3, [fp, #-8]
+ 1452 0bc8 0400A0E3 		mov	r0, #4
+ 1453 0bcc 60119FE5 		ldr	r1, .L69+20
+ 1454 0bd0 0320A0E1 		mov	r2, r3
+ 1455 0bd4 FEFFFFEB 		bl	CyU3PDebugPrint
+ 426:../ar0234.c   **** 	#endif
+ 427:../ar0234.c   **** 	CyU3PThreadSleep(100);
+ 1456              		.loc 1 427 0
+ 1457 0bd8 6400A0E3 		mov	r0, #100
+ 1458 0bdc FEFFFFEB 		bl	_tx_thread_sleep
+ 428:../ar0234.c   **** 
+ 429:../ar0234.c   **** 	/* 0x30A6 */
+ 430:../ar0234.c   **** 	s1 = CyFxGetSensor1param(0x30A6); s2 = CyFxGetSensor2param(0x30A6);
+ 1459              		.loc 1 430 0
+ 1460 0be0 50019FE5 		ldr	r0, .L69+24
+ 1461 0be4 FEFFFFEB 		bl	CyFxGetSensor1param
+ 1462 0be8 0030A0E1 		mov	r3, r0
+ 1463 0bec B6304BE1 		strh	r3, [fp, #-6]	@ movhi
+ 1464 0bf0 40019FE5 		ldr	r0, .L69+24
+ 1465 0bf4 FEFFFFEB 		bl	CyFxGetSensor2param
+ 1466 0bf8 0030A0E1 		mov	r3, r0
+ 1467 0bfc B8304BE1 		strh	r3, [fp, #-8]	@ movhi
+ 431:../ar0234.c   **** 	#ifdef AR0234_DIAG_DEBUG
+ 432:../ar0234.c   **** 	CyU3PDebugPrint(4, "REG read reg=0x30A6 s1=%d\n", s1);
+ 1468              		.loc 1 432 0
+ 1469 0c00 B6305BE1 		ldrh	r3, [fp, #-6]
+ 1470 0c04 0400A0E3 		mov	r0, #4
+ 1471 0c08 2C119FE5 		ldr	r1, .L69+28
+ 1472 0c0c 0320A0E1 		mov	r2, r3
+ 1473 0c10 FEFFFFEB 		bl	CyU3PDebugPrint
+ 433:../ar0234.c   **** 	CyU3PDebugPrint(4, "REG read reg=0x30A6 s2=%d\n", s2);
+ 1474              		.loc 1 433 0
+ 1475 0c14 B8305BE1 		ldrh	r3, [fp, #-8]
+ 1476 0c18 0400A0E3 		mov	r0, #4
+ 1477 0c1c 1C119FE5 		ldr	r1, .L69+32
+ 1478 0c20 0320A0E1 		mov	r2, r3
+ 1479 0c24 FEFFFFEB 		bl	CyU3PDebugPrint
+ 434:../ar0234.c   **** 	#endif
+ 435:../ar0234.c   **** 	CyU3PThreadSleep(100);
+ 1480              		.loc 1 435 0
+ 1481 0c28 6400A0E3 		mov	r0, #100
+ 1482 0c2c FEFFFFEB 		bl	_tx_thread_sleep
+ 436:../ar0234.c   **** 
+ 437:../ar0234.c   **** 	/* 0x3040 */
+ 438:../ar0234.c   **** 	s1 = CyFxGetSensor1param(0x3040); s2 = CyFxGetSensor2param(0x3040);
+ 1483              		.loc 1 438 0
+ 1484 0c30 C10DA0E3 		mov	r0, #12352
+ 1485 0c34 FEFFFFEB 		bl	CyFxGetSensor1param
+ 1486 0c38 0030A0E1 		mov	r3, r0
+ 1487 0c3c B6304BE1 		strh	r3, [fp, #-6]	@ movhi
+ 1488 0c40 C10DA0E3 		mov	r0, #12352
+ 1489 0c44 FEFFFFEB 		bl	CyFxGetSensor2param
+ 1490 0c48 0030A0E1 		mov	r3, r0
+ 1491 0c4c B8304BE1 		strh	r3, [fp, #-8]	@ movhi
+ 439:../ar0234.c   **** 	#ifdef AR0234_DIAG_DEBUG
+ 440:../ar0234.c   **** 	CyU3PDebugPrint(4, "REG read reg=0x3040 s1=%d\n", s1);
+ 1492              		.loc 1 440 0
+ 1493 0c50 B6305BE1 		ldrh	r3, [fp, #-6]
+ 1494 0c54 0400A0E3 		mov	r0, #4
+ 1495 0c58 E4109FE5 		ldr	r1, .L69+36
+ 1496 0c5c 0320A0E1 		mov	r2, r3
+ 1497 0c60 FEFFFFEB 		bl	CyU3PDebugPrint
+ 441:../ar0234.c   **** 	CyU3PDebugPrint(4, "REG read reg=0x3040 s2=%d\n", s2);
+ 1498              		.loc 1 441 0
+ 1499 0c64 B8305BE1 		ldrh	r3, [fp, #-8]
+ 1500 0c68 0400A0E3 		mov	r0, #4
+ 1501 0c6c D4109FE5 		ldr	r1, .L69+40
+ 1502 0c70 0320A0E1 		mov	r2, r3
+ 1503 0c74 FEFFFFEB 		bl	CyU3PDebugPrint
+ 442:../ar0234.c   **** 	#endif
+ 443:../ar0234.c   **** 	CyU3PThreadSleep(100);
+ 1504              		.loc 1 443 0
+ 1505 0c78 6400A0E3 		mov	r0, #100
+ 1506 0c7c FEFFFFEB 		bl	_tx_thread_sleep
+ 444:../ar0234.c   **** 
+ 445:../ar0234.c   **** 	/* 0x30AE */
+ 446:../ar0234.c   **** 	s1 = CyFxGetSensor1param(0x30AE); s2 = CyFxGetSensor2param(0x30AE);
+ 1507              		.loc 1 446 0
+ 1508 0c80 C4009FE5 		ldr	r0, .L69+44
+ 1509 0c84 FEFFFFEB 		bl	CyFxGetSensor1param
+ 1510 0c88 0030A0E1 		mov	r3, r0
+ 1511 0c8c B6304BE1 		strh	r3, [fp, #-6]	@ movhi
+ 1512 0c90 B4009FE5 		ldr	r0, .L69+44
+ 1513 0c94 FEFFFFEB 		bl	CyFxGetSensor2param
+ 1514 0c98 0030A0E1 		mov	r3, r0
+ 1515 0c9c B8304BE1 		strh	r3, [fp, #-8]	@ movhi
+ 447:../ar0234.c   **** 	#ifdef AR0234_DIAG_DEBUG
+ 448:../ar0234.c   **** 	CyU3PDebugPrint(4, "REG read reg=0x30AE s1=%d\n", s1);
+ 1516              		.loc 1 448 0
+ 1517 0ca0 B6305BE1 		ldrh	r3, [fp, #-6]
+ 1518 0ca4 0400A0E3 		mov	r0, #4
+ 1519 0ca8 A0109FE5 		ldr	r1, .L69+48
+ 1520 0cac 0320A0E1 		mov	r2, r3
+ 1521 0cb0 FEFFFFEB 		bl	CyU3PDebugPrint
+ 449:../ar0234.c   **** 	CyU3PDebugPrint(4, "REG read reg=0x30AE s2=%d\n", s2);
+ 1522              		.loc 1 449 0
+ 1523 0cb4 B8305BE1 		ldrh	r3, [fp, #-8]
+ 1524 0cb8 0400A0E3 		mov	r0, #4
+ 1525 0cbc 90109FE5 		ldr	r1, .L69+52
+ 1526 0cc0 0320A0E1 		mov	r2, r3
+ 1527 0cc4 FEFFFFEB 		bl	CyU3PDebugPrint
+ 450:../ar0234.c   **** 	#endif
+ 451:../ar0234.c   **** 	CyU3PThreadSleep(100);
+ 1528              		.loc 1 451 0
+ 1529 0cc8 6400A0E3 		mov	r0, #100
+ 1530 0ccc FEFFFFEB 		bl	_tx_thread_sleep
+ 452:../ar0234.c   **** 
+ 453:../ar0234.c   **** 	/* 0x30A8 */
+ 454:../ar0234.c   **** 	s1 = CyFxGetSensor1param(0x30A8); s2 = CyFxGetSensor2param(0x30A8);
+ 1531              		.loc 1 454 0
+ 1532 0cd0 80009FE5 		ldr	r0, .L69+56
+ 1533 0cd4 FEFFFFEB 		bl	CyFxGetSensor1param
+ 1534 0cd8 0030A0E1 		mov	r3, r0
+ 1535 0cdc B6304BE1 		strh	r3, [fp, #-6]	@ movhi
+ 1536 0ce0 70009FE5 		ldr	r0, .L69+56
+ 1537 0ce4 FEFFFFEB 		bl	CyFxGetSensor2param
+ 1538 0ce8 0030A0E1 		mov	r3, r0
+ 1539 0cec B8304BE1 		strh	r3, [fp, #-8]	@ movhi
+ 455:../ar0234.c   **** 	#ifdef AR0234_DIAG_DEBUG
+ 456:../ar0234.c   **** 	CyU3PDebugPrint(4, "REG read reg=0x30A8 s1=%d\n", s1);
+ 1540              		.loc 1 456 0
+ 1541 0cf0 B6305BE1 		ldrh	r3, [fp, #-6]
+ 1542 0cf4 0400A0E3 		mov	r0, #4
+ 1543 0cf8 5C109FE5 		ldr	r1, .L69+60
+ 1544 0cfc 0320A0E1 		mov	r2, r3
+ 1545 0d00 FEFFFFEB 		bl	CyU3PDebugPrint
+ 457:../ar0234.c   **** 	CyU3PDebugPrint(4, "REG read reg=0x30A8 s2=%d\n", s2);
+ 1546              		.loc 1 457 0
+ 1547 0d04 B8305BE1 		ldrh	r3, [fp, #-8]
+ 1548 0d08 0400A0E3 		mov	r0, #4
+ 1549 0d0c 4C109FE5 		ldr	r1, .L69+64
+ 1550 0d10 0320A0E1 		mov	r2, r3
+ 1551 0d14 FEFFFFEB 		bl	CyU3PDebugPrint
+ 458:../ar0234.c   **** 	#endif
+ 459:../ar0234.c   **** }
+ 1552              		.loc 1 459 0
+ 1553 0d18 04D04BE2 		sub	sp, fp, #4
+ 1554              		@ sp needed
+ 1555 0d1c 0088BDE8 		ldmfd	sp!, {fp, pc}
+ 1556              	.L70:
+ 1557              		.align	2
+ 1558              	.L69:
+ 1559 0d20 B0300000 		.word	12464
+ 1560 0d24 B4000000 		.word	.LC9
+ 1561 0d28 D0000000 		.word	.LC10
+ 1562 0d2c A2300000 		.word	12450
+ 1563 0d30 EC000000 		.word	.LC11
+ 1564 0d34 08010000 		.word	.LC12
+ 1565 0d38 A6300000 		.word	12454
+ 1566 0d3c 24010000 		.word	.LC13
+ 1567 0d40 40010000 		.word	.LC14
+ 1568 0d44 5C010000 		.word	.LC15
+ 1569 0d48 78010000 		.word	.LC16
+ 1570 0d4c AE300000 		.word	12462
+ 1571 0d50 94010000 		.word	.LC17
+ 1572 0d54 B0010000 		.word	.LC18
+ 1573 0d58 A8300000 		.word	12456
+ 1574 0d5c CC010000 		.word	.LC19
+ 1575 0d60 E8010000 		.word	.LC20
+ 1576              		.cfi_endproc
+ 1577              	.LFE18:
+ 1579              		.align	2
+ 1580              		.global	AR0234_Context_Init
+ 1582              	AR0234_Context_Init:
+ 1583              	.LFB19:
+ 460:../ar0234.c   **** 
+ 461:../ar0234.c   **** void AR0234_Context_Init ()
+ 462:../ar0234.c   **** {
+ 1584              		.loc 1 462 0
+ 1585              		.cfi_startproc
+ 1586              		@ args = 0, pretend = 0, frame = 0
+ 1587              		@ frame_needed = 1, uses_anonymous_args = 0
+ 1588 0d64 00482DE9 		stmfd	sp!, {fp, lr}
+ 1589              	.LCFI38:
+ 1590              		.cfi_def_cfa_offset 8
+ 1591              		.cfi_offset 11, -8
+ 1592              		.cfi_offset 14, -4
+ 1593 0d68 04B08DE2 		add	fp, sp, #4
+ 1594              	.LCFI39:
+ 1595              		.cfi_def_cfa 11, 4
+ 463:../ar0234.c   **** 	AR0234_TxnInit();
+ 1596              		.loc 1 463 0
+ 1597 0d6c A3FCFFEB 		bl	AR0234_TxnInit
+ 464:../ar0234.c   **** 	glTempSensorEnabled = CyFalse;
+ 1598              		.loc 1 464 0
+ 1599 0d70 C0309FE5 		ldr	r3, .L73
+ 1600 0d74 0020A0E3 		mov	r2, #0
+ 1601 0d78 002083E5 		str	r2, [r3]
+ 465:../ar0234.c   **** 	glTempCalibrationValid = CyFalse;
+ 1602              		.loc 1 465 0
+ 1603 0d7c B8309FE5 		ldr	r3, .L73+4
+ 1604 0d80 0020A0E3 		mov	r2, #0
+ 1605 0d84 002083E5 		str	r2, [r3]
+ 466:../ar0234.c   **** 	glTempCalibSensor1 = 0;
+ 1606              		.loc 1 466 0
+ 1607 0d88 B0309FE5 		ldr	r3, .L73+8
+ 1608 0d8c 0020A0E3 		mov	r2, #0
+ 1609 0d90 B020C3E1 		strh	r2, [r3]	@ movhi
+ 467:../ar0234.c   **** 	glTempCalibSensor2 = 0;
+ 1610              		.loc 1 467 0
+ 1611 0d94 A8309FE5 		ldr	r3, .L73+12
+ 1612 0d98 0020A0E3 		mov	r2, #0
+ 1613 0d9c B020C3E1 		strh	r2, [r3]	@ movhi
+ 468:../ar0234.c   **** 
+ 469:../ar0234.c   **** 	AR0234ContextConfig.laserExposureSensor1 = 0x0093;   //MONO
+ 1614              		.loc 1 469 0
+ 1615 0da0 A0309FE5 		ldr	r3, .L73+16
+ 1616 0da4 9320A0E3 		mov	r2, #147
+ 1617 0da8 B020C3E1 		strh	r2, [r3]	@ movhi
+ 470:../ar0234.c   **** 	AR0234ContextConfig.laserExposureSensor2 = 0x0093;   //RGB
+ 1618              		.loc 1 470 0
+ 1619 0dac 94309FE5 		ldr	r3, .L73+16
+ 1620 0db0 9320A0E3 		mov	r2, #147
+ 1621 0db4 B620C3E1 		strh	r2, [r3, #6]	@ movhi
+ 471:../ar0234.c   **** 	AR0234ContextConfig.whiteLightExposureSensor1 = 0x0126;
+ 1622              		.loc 1 471 0
+ 1623 0db8 88309FE5 		ldr	r3, .L73+16
+ 1624 0dbc 88209FE5 		ldr	r2, .L73+20
+ 1625 0dc0 B220C3E1 		strh	r2, [r3, #2]	@ movhi
+ 472:../ar0234.c   **** 	AR0234ContextConfig.whiteLightExposureSensor2 = 0x0126;
+ 1626              		.loc 1 472 0
+ 1627 0dc4 7C309FE5 		ldr	r3, .L73+16
+ 1628 0dc8 7C209FE5 		ldr	r2, .L73+20
+ 1629 0dcc B820C3E1 		strh	r2, [r3, #8]	@ movhi
+ 473:../ar0234.c   **** 	AR0234ContextConfig.infraredLightExposureSensor1 = 0x0126;
+ 1630              		.loc 1 473 0
+ 1631 0dd0 70309FE5 		ldr	r3, .L73+16
+ 1632 0dd4 70209FE5 		ldr	r2, .L73+20
+ 1633 0dd8 B420C3E1 		strh	r2, [r3, #4]	@ movhi
+ 474:../ar0234.c   **** 	AR0234ContextConfig.infraredLightExposureSensor2 = 0x0126;
+ 1634              		.loc 1 474 0
+ 1635 0ddc 64309FE5 		ldr	r3, .L73+16
+ 1636 0de0 64209FE5 		ldr	r2, .L73+20
+ 1637 0de4 BA20C3E1 		strh	r2, [r3, #10]	@ movhi
+ 475:../ar0234.c   **** 
+ 476:../ar0234.c   **** 	AR0234ContextConfig.laserGainSensor1 = 0x0080;
+ 1638              		.loc 1 476 0
+ 1639 0de8 58309FE5 		ldr	r3, .L73+16
+ 1640 0dec 8020A0E3 		mov	r2, #128
+ 1641 0df0 BC20C3E1 		strh	r2, [r3, #12]	@ movhi
+ 477:../ar0234.c   **** 	AR0234ContextConfig.laserGainSensor2 = 0x0080;
+ 1642              		.loc 1 477 0
+ 1643 0df4 4C309FE5 		ldr	r3, .L73+16
+ 1644 0df8 8020A0E3 		mov	r2, #128
+ 1645 0dfc B221C3E1 		strh	r2, [r3, #18]	@ movhi
+ 478:../ar0234.c   **** 	AR0234ContextConfig.whiteLightGainSensor1 = 0x0080;
+ 1646              		.loc 1 478 0
+ 1647 0e00 40309FE5 		ldr	r3, .L73+16
+ 1648 0e04 8020A0E3 		mov	r2, #128
+ 1649 0e08 BE20C3E1 		strh	r2, [r3, #14]	@ movhi
+ 479:../ar0234.c   **** 	AR0234ContextConfig.whiteLightGainSensor2 = 0x0080;
+ 1650              		.loc 1 479 0
+ 1651 0e0c 34309FE5 		ldr	r3, .L73+16
+ 1652 0e10 8020A0E3 		mov	r2, #128
+ 1653 0e14 B421C3E1 		strh	r2, [r3, #20]	@ movhi
+ 480:../ar0234.c   **** 	AR0234ContextConfig.infraredLightGainSensor1 = 0x0080;
+ 1654              		.loc 1 480 0
+ 1655 0e18 28309FE5 		ldr	r3, .L73+16
+ 1656 0e1c 8020A0E3 		mov	r2, #128
+ 1657 0e20 B021C3E1 		strh	r2, [r3, #16]	@ movhi
+ 481:../ar0234.c   **** 	AR0234ContextConfig.infraredLightGainSensor2 = 0x0080;
+ 1658              		.loc 1 481 0
+ 1659 0e24 1C309FE5 		ldr	r3, .L73+16
+ 1660 0e28 8020A0E3 		mov	r2, #128
+ 1661 0e2c B621C3E1 		strh	r2, [r3, #22]	@ movhi
+ 482:../ar0234.c   **** 
+ 483:../ar0234.c   **** 	return;
+ 1662              		.loc 1 483 0
+ 1663 0e30 0000A0E1 		mov	r0, r0	@ nop
+ 484:../ar0234.c   **** }
+ 1664              		.loc 1 484 0
+ 1665 0e34 0088BDE8 		ldmfd	sp!, {fp, pc}
+ 1666              	.L74:
+ 1667              		.align	2
+ 1668              	.L73:
+ 1669 0e38 40000000 		.word	glTempSensorEnabled
+ 1670 0e3c 44000000 		.word	glTempCalibrationValid
+ 1671 0e40 48000000 		.word	glTempCalibSensor1
+ 1672 0e44 4A000000 		.word	glTempCalibSensor2
+ 1673 0e48 00000000 		.word	AR0234ContextConfig
+ 1674 0e4c 26010000 		.word	294
+ 1675              		.cfi_endproc
+ 1676              	.LFE19:
+ 1678              	.Letext0:
+ 1679              		.file 2 "c:\\program files (x86)\\cypress\\ez-usb fx3 sdk\\1.3\\arm gcc\\arm-none-eabi\\include\\s
+ 1680              		.file 3 "C:\\Program Files (x86)\\Cypress\\EZ-USB FX3 SDK\\1.3\\firmware\\u3p_firmware\\inc/cyu3ty
+ 1681              		.file 4 "C:\\Program Files (x86)\\Cypress\\EZ-USB FX3 SDK\\1.3\\firmware\\u3p_firmware\\inc/tx_por
+ 1682              		.file 5 "C:\\Program Files (x86)\\Cypress\\EZ-USB FX3 SDK\\1.3\\firmware\\u3p_firmware\\inc/tx_api
+ 1683              		.file 6 "C:\\Program Files (x86)\\Cypress\\EZ-USB FX3 SDK\\1.3\\firmware\\u3p_firmware\\inc/cyu3i2
+ 1684              		.file 7 "../ar0234.h"
+ 1685              		.file 8 "C:\\Program Files (x86)\\Cypress\\EZ-USB FX3 SDK\\1.3\\firmware\\u3p_firmware\\inc/cyu3dm
+ 1686              		.file 9 "C:\\Program Files (x86)\\Cypress\\EZ-USB FX3 SDK\\1.3\\firmware\\u3p_firmware\\inc/cyu3er
+DEFINED SYMBOLS
+                            *ABS*:00000000 ar0234.c
+                            *COM*:00000040 glAr0234Buffer
+                            *COM*:00000038 AR0234ContextConfig
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:19     .data:00000000 $d
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:22     .data:00000000 glLastTempSensor1
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:27     .data:00000004 glLastTempSensor2
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:30     .bss:00000000 $d
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:31     .bss:00000000 glIsTempMonitorActive
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:34     .bss:00000004 glAr0234TxnMutex
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:37     .bss:0000003c glAr0234TxnMutexReady
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:40     .bss:00000040 glTempSensorEnabled
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:43     .bss:00000044 glTempCalibrationValid
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:46     .bss:00000048 glTempCalibSensor1
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:49     .bss:0000004a glTempCalibSensor2
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:52     .text:00000000 $a
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:54     .text:00000000 AR0234_TxnInit
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:93     .text:00000048 $d
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:98     .text:00000050 $a
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:100    .text:00000050 AR0234_TxnLock
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:129    .text:00000078 $d
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:134    .text:00000080 $a
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:136    .text:00000080 AR0234_TxnUnlock
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:164    .text:000000a4 $d
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:169    .text:000000ac $a
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:172    .text:000000ac TemperatureMonitor_Start
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:197    .text:000000c8 $d
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:201    .text:000000cc $a
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:204    .text:000000cc CyFxUsbI2cTransfer_AR0234_WR
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:289    .text:00000198 CyFxUsbI2cTransfer_AR0234_RD
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:368    .text:00000250 AR0234_Write_Sensor1
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:445    .text:00000308 AR0234_read_sensor1
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:498    .text:00000380 AR0234_Write_Sensor2
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:575    .text:00000438 CyFxGetSensor1param
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:689    .text:00000564 CyFxGetSensor2param
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:798    .rodata:00000000 $d
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:805    .text:00000688 TemperatureSensor_Enable
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:846    .text:000006d8 $d
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:859    .text:000006e0 $a
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:862    .text:000006e0 TemperatureSensor_ReadCalibration
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:930    .text:0000078c $d
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:944    .text:00000798 $a
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:947    .text:00000798 TemperatureSensor_ReadRawValue
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:1015   .text:00000844 $d
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:1025   .text:00000850 $a
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:1028   .text:00000850 TemperatureSensor_CalculateTemperature
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:1080   .text:000008d0 $d
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:1097   .text:000008d8 $a
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:1100   .text:000008d8 TemperatureSensor_ReadTemperature
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:1221   .text:00000a28 $d
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:1231   .text:00000a44 $a
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:1234   .text:00000a44 TemperatureMonitor_GetLastTemperature
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:1279   .text:00000a9c $d
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:1289   .text:00000aa4 $a
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:1292   .text:00000aa4 TemperatureMonitor_Process
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:1348   .text:00000b24 $d
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:1393   .text:00000b34 $a
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:1396   .text:00000b34 AR0234_DumpCoreModeRegisters_Sequential100ms
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:1559   .text:00000d20 $d
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:1579   .text:00000d64 $a
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:1582   .text:00000d64 AR0234_Context_Init
+C:\Users\liuxin\AppData\Local\Temp\cc4H7S02.s:1669   .text:00000e38 $d
+                     .debug_frame:00000010 $d
+
+UNDEFINED SYMBOLS
+_txe_mutex_create
+_txe_mutex_get
+_txe_mutex_put
+CyU3PI2cTransmitBytes
+CyU3PI2cReceiveBytes
+FPGA_Write
+FPGA_Read
+FPGA_Write_Delay_1ms
+_tx_thread_sleep
+CyU3PDebugPrint
+__aeabi_ui2f
+__aeabi_fsub
+__aeabi_fmul
+__aeabi_fadd
+__aeabi_f2iz
+_tx_time_get

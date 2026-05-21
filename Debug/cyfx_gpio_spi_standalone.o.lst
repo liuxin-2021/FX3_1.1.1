@@ -1,0 +1,2144 @@
+   1              		.cpu arm926ej-s
+   2              		.fpu softvfp
+   3              		.eabi_attribute 20, 1
+   4              		.eabi_attribute 21, 1
+   5              		.eabi_attribute 23, 3
+   6              		.eabi_attribute 24, 1
+   7              		.eabi_attribute 25, 1
+   8              		.eabi_attribute 26, 1
+   9              		.eabi_attribute 30, 6
+  10              		.eabi_attribute 34, 0
+  11              		.eabi_attribute 18, 4
+  12              		.file	"cyfx_gpio_spi_standalone.c"
+  13              		.text
+  14              	.Ltext0:
+  15              		.cfi_sections	.debug_frame
+  16              		.align	2
+  18              	CyFxGpioSpiDelayHalfCycle:
+  19              	.LFB0:
+  20              		.file 1 "../standalone_spi/cyfx_gpio_spi_standalone.c"
+   1:../standalone_spi/cyfx_gpio_spi_standalone.c **** #include "cyu3system.h"
+   2:../standalone_spi/cyfx_gpio_spi_standalone.c **** #include "cyu3error.h"
+   3:../standalone_spi/cyfx_gpio_spi_standalone.c **** #include "cyu3utils.h"
+   4:../standalone_spi/cyfx_gpio_spi_standalone.c **** #include "cyfx_gpio_spi_standalone.h"
+   5:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+   6:../standalone_spi/cyfx_gpio_spi_standalone.c **** #define CYFX_SPI_MIN_BITCOUNT   (1u)
+   7:../standalone_spi/cyfx_gpio_spi_standalone.c **** #define CYFX_SPI_MAX_BITCOUNT   (32u)
+   8:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+   9:../standalone_spi/cyfx_gpio_spi_standalone.c **** static void
+  10:../standalone_spi/cyfx_gpio_spi_standalone.c **** CyFxGpioSpiDelayHalfCycle (const CyFxGpioSpiContext_t *ctx)
+  11:../standalone_spi/cyfx_gpio_spi_standalone.c **** {
+  21              		.loc 1 11 0
+  22              		.cfi_startproc
+  23              		@ args = 0, pretend = 0, frame = 16
+  24              		@ frame_needed = 1, uses_anonymous_args = 0
+  25 0000 00482DE9 		stmfd	sp!, {fp, lr}
+  26              	.LCFI0:
+  27              		.cfi_def_cfa_offset 8
+  28              		.cfi_offset 11, -8
+  29              		.cfi_offset 14, -4
+  30 0004 04B08DE2 		add	fp, sp, #4
+  31              	.LCFI1:
+  32              		.cfi_def_cfa 11, 4
+  33 0008 10D04DE2 		sub	sp, sp, #16
+  34 000c 10000BE5 		str	r0, [fp, #-16]
+  12:../standalone_spi/cyfx_gpio_spi_standalone.c ****     volatile uint32_t i;
+  13:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+  14:../standalone_spi/cyfx_gpio_spi_standalone.c ****     if (ctx->timing.halfPeriodUs != 0u)
+  35              		.loc 1 14 0
+  36 0010 10301BE5 		ldr	r3, [fp, #-16]
+  37 0014 103093E5 		ldr	r3, [r3, #16]
+  38 0018 000053E3 		cmp	r3, #0
+  39 001c 0500000A 		beq	.L2
+  15:../standalone_spi/cyfx_gpio_spi_standalone.c ****     {
+  16:../standalone_spi/cyfx_gpio_spi_standalone.c ****         CyU3PBusyWait (ctx->timing.halfPeriodUs);
+  40              		.loc 1 16 0
+  41 0020 10301BE5 		ldr	r3, [fp, #-16]
+  42 0024 103093E5 		ldr	r3, [r3, #16]
+  43 0028 0338A0E1 		mov	r3, r3, asl #16
+  44 002c 2338A0E1 		mov	r3, r3, lsr #16
+  45 0030 0300A0E1 		mov	r0, r3
+  46 0034 FEFFFFEB 		bl	CyFx3BusyWait
+  47              	.L2:
+  17:../standalone_spi/cyfx_gpio_spi_standalone.c ****     }
+  18:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+  19:../standalone_spi/cyfx_gpio_spi_standalone.c ****     for (i = 0u; i < ctx->timing.edgeDelayCycles; ++i)
+  48              		.loc 1 19 0
+  49 0038 0030A0E3 		mov	r3, #0
+  50 003c 08300BE5 		str	r3, [fp, #-8]
+  51 0040 040000EA 		b	.L3
+  52              	.L4:
+  20:../standalone_spi/cyfx_gpio_spi_standalone.c ****     {
+  21:../standalone_spi/cyfx_gpio_spi_standalone.c ****         i = i;
+  53              		.loc 1 21 0 discriminator 2
+  54 0044 08301BE5 		ldr	r3, [fp, #-8]
+  55 0048 08300BE5 		str	r3, [fp, #-8]
+  19:../standalone_spi/cyfx_gpio_spi_standalone.c ****     {
+  56              		.loc 1 19 0 discriminator 2
+  57 004c 08301BE5 		ldr	r3, [fp, #-8]
+  58 0050 013083E2 		add	r3, r3, #1
+  59 0054 08300BE5 		str	r3, [fp, #-8]
+  60              	.L3:
+  19:../standalone_spi/cyfx_gpio_spi_standalone.c ****     {
+  61              		.loc 1 19 0 is_stmt 0 discriminator 1
+  62 0058 10301BE5 		ldr	r3, [fp, #-16]
+  63 005c 142093E5 		ldr	r2, [r3, #20]
+  64 0060 08301BE5 		ldr	r3, [fp, #-8]
+  65 0064 030052E1 		cmp	r2, r3
+  66 0068 F5FFFF8A 		bhi	.L4
+  22:../standalone_spi/cyfx_gpio_spi_standalone.c ****     }
+  23:../standalone_spi/cyfx_gpio_spi_standalone.c **** }
+  67              		.loc 1 23 0 is_stmt 1
+  68 006c 04D04BE2 		sub	sp, fp, #4
+  69              		@ sp needed
+  70 0070 0088BDE8 		ldmfd	sp!, {fp, pc}
+  71              		.cfi_endproc
+  72              	.LFE0:
+  74              		.align	2
+  76              	CyFxGpioSpiSetClock:
+  77              	.LFB1:
+  24:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+  25:../standalone_spi/cyfx_gpio_spi_standalone.c **** static CyU3PReturnStatus_t
+  26:../standalone_spi/cyfx_gpio_spi_standalone.c **** CyFxGpioSpiSetClock (const CyFxGpioSpiContext_t *ctx, CyBool_t level)
+  27:../standalone_spi/cyfx_gpio_spi_standalone.c **** {
+  78              		.loc 1 27 0
+  79              		.cfi_startproc
+  80              		@ args = 0, pretend = 0, frame = 8
+  81              		@ frame_needed = 1, uses_anonymous_args = 0
+  82 0074 00482DE9 		stmfd	sp!, {fp, lr}
+  83              	.LCFI2:
+  84              		.cfi_def_cfa_offset 8
+  85              		.cfi_offset 11, -8
+  86              		.cfi_offset 14, -4
+  87 0078 04B08DE2 		add	fp, sp, #4
+  88              	.LCFI3:
+  89              		.cfi_def_cfa 11, 4
+  90 007c 08D04DE2 		sub	sp, sp, #8
+  91 0080 08000BE5 		str	r0, [fp, #-8]
+  92 0084 0C100BE5 		str	r1, [fp, #-12]
+  28:../standalone_spi/cyfx_gpio_spi_standalone.c ****     return CyU3PGpioSetValue (ctx->pinMap.clk, level);
+  93              		.loc 1 28 0
+  94 0088 08301BE5 		ldr	r3, [fp, #-8]
+  95 008c 0030D3E5 		ldrb	r3, [r3]	@ zero_extendqisi2
+  96 0090 0300A0E1 		mov	r0, r3
+  97 0094 0C101BE5 		ldr	r1, [fp, #-12]
+  98 0098 FEFFFFEB 		bl	CyU3PGpioSetValue
+  99 009c 0030A0E1 		mov	r3, r0
+  29:../standalone_spi/cyfx_gpio_spi_standalone.c **** }
+ 100              		.loc 1 29 0
+ 101 00a0 0300A0E1 		mov	r0, r3
+ 102 00a4 04D04BE2 		sub	sp, fp, #4
+ 103              		@ sp needed
+ 104 00a8 0088BDE8 		ldmfd	sp!, {fp, pc}
+ 105              		.cfi_endproc
+ 106              	.LFE1:
+ 108              		.align	2
+ 110              	CyFxGpioSpiSetMosi:
+ 111              	.LFB2:
+  30:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+  31:../standalone_spi/cyfx_gpio_spi_standalone.c **** static CyU3PReturnStatus_t
+  32:../standalone_spi/cyfx_gpio_spi_standalone.c **** CyFxGpioSpiSetMosi (const CyFxGpioSpiContext_t *ctx, CyBool_t level)
+  33:../standalone_spi/cyfx_gpio_spi_standalone.c **** {
+ 112              		.loc 1 33 0
+ 113              		.cfi_startproc
+ 114              		@ args = 0, pretend = 0, frame = 8
+ 115              		@ frame_needed = 1, uses_anonymous_args = 0
+ 116 00ac 00482DE9 		stmfd	sp!, {fp, lr}
+ 117              	.LCFI4:
+ 118              		.cfi_def_cfa_offset 8
+ 119              		.cfi_offset 11, -8
+ 120              		.cfi_offset 14, -4
+ 121 00b0 04B08DE2 		add	fp, sp, #4
+ 122              	.LCFI5:
+ 123              		.cfi_def_cfa 11, 4
+ 124 00b4 08D04DE2 		sub	sp, sp, #8
+ 125 00b8 08000BE5 		str	r0, [fp, #-8]
+ 126 00bc 0C100BE5 		str	r1, [fp, #-12]
+  34:../standalone_spi/cyfx_gpio_spi_standalone.c ****     return CyU3PGpioSetValue (ctx->pinMap.mosi, level);
+ 127              		.loc 1 34 0
+ 128 00c0 08301BE5 		ldr	r3, [fp, #-8]
+ 129 00c4 0130D3E5 		ldrb	r3, [r3, #1]	@ zero_extendqisi2
+ 130 00c8 0300A0E1 		mov	r0, r3
+ 131 00cc 0C101BE5 		ldr	r1, [fp, #-12]
+ 132 00d0 FEFFFFEB 		bl	CyU3PGpioSetValue
+ 133 00d4 0030A0E1 		mov	r3, r0
+  35:../standalone_spi/cyfx_gpio_spi_standalone.c **** }
+ 134              		.loc 1 35 0
+ 135 00d8 0300A0E1 		mov	r0, r3
+ 136 00dc 04D04BE2 		sub	sp, fp, #4
+ 137              		@ sp needed
+ 138 00e0 0088BDE8 		ldmfd	sp!, {fp, pc}
+ 139              		.cfi_endproc
+ 140              	.LFE2:
+ 142              		.align	2
+ 144              	CyFxGpioSpiSetCs:
+ 145              	.LFB3:
+  36:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+  37:../standalone_spi/cyfx_gpio_spi_standalone.c **** static CyU3PReturnStatus_t
+  38:../standalone_spi/cyfx_gpio_spi_standalone.c **** CyFxGpioSpiSetCs (const CyFxGpioSpiContext_t *ctx, CyBool_t level)
+  39:../standalone_spi/cyfx_gpio_spi_standalone.c **** {
+ 146              		.loc 1 39 0
+ 147              		.cfi_startproc
+ 148              		@ args = 0, pretend = 0, frame = 8
+ 149              		@ frame_needed = 1, uses_anonymous_args = 0
+ 150 00e4 00482DE9 		stmfd	sp!, {fp, lr}
+ 151              	.LCFI6:
+ 152              		.cfi_def_cfa_offset 8
+ 153              		.cfi_offset 11, -8
+ 154              		.cfi_offset 14, -4
+ 155 00e8 04B08DE2 		add	fp, sp, #4
+ 156              	.LCFI7:
+ 157              		.cfi_def_cfa 11, 4
+ 158 00ec 08D04DE2 		sub	sp, sp, #8
+ 159 00f0 08000BE5 		str	r0, [fp, #-8]
+ 160 00f4 0C100BE5 		str	r1, [fp, #-12]
+  40:../standalone_spi/cyfx_gpio_spi_standalone.c ****     return CyU3PGpioSetValue (ctx->pinMap.cs, level);
+ 161              		.loc 1 40 0
+ 162 00f8 08301BE5 		ldr	r3, [fp, #-8]
+ 163 00fc 0330D3E5 		ldrb	r3, [r3, #3]	@ zero_extendqisi2
+ 164 0100 0300A0E1 		mov	r0, r3
+ 165 0104 0C101BE5 		ldr	r1, [fp, #-12]
+ 166 0108 FEFFFFEB 		bl	CyU3PGpioSetValue
+ 167 010c 0030A0E1 		mov	r3, r0
+  41:../standalone_spi/cyfx_gpio_spi_standalone.c **** }
+ 168              		.loc 1 41 0
+ 169 0110 0300A0E1 		mov	r0, r3
+ 170 0114 04D04BE2 		sub	sp, fp, #4
+ 171              		@ sp needed
+ 172 0118 0088BDE8 		ldmfd	sp!, {fp, pc}
+ 173              		.cfi_endproc
+ 174              	.LFE3:
+ 176              		.align	2
+ 178              	CyFxGpioSpiBitIndex:
+ 179              	.LFB4:
+  42:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+  43:../standalone_spi/cyfx_gpio_spi_standalone.c **** static uint8_t
+  44:../standalone_spi/cyfx_gpio_spi_standalone.c **** CyFxGpioSpiBitIndex (const CyFxGpioSpiTiming_t *timing, uint8_t bitCount, uint8_t i)
+  45:../standalone_spi/cyfx_gpio_spi_standalone.c **** {
+ 180              		.loc 1 45 0
+ 181              		.cfi_startproc
+ 182              		@ args = 0, pretend = 0, frame = 8
+ 183              		@ frame_needed = 1, uses_anonymous_args = 0
+ 184              		@ link register save eliminated.
+ 185 011c 04B02DE5 		str	fp, [sp, #-4]!
+ 186              	.LCFI8:
+ 187              		.cfi_def_cfa_offset 4
+ 188              		.cfi_offset 11, -4
+ 189 0120 00B08DE2 		add	fp, sp, #0
+ 190              	.LCFI9:
+ 191              		.cfi_def_cfa_register 11
+ 192 0124 0CD04DE2 		sub	sp, sp, #12
+ 193 0128 08000BE5 		str	r0, [fp, #-8]
+ 194 012c 0230A0E1 		mov	r3, r2
+ 195 0130 0120A0E1 		mov	r2, r1
+ 196 0134 09204BE5 		strb	r2, [fp, #-9]
+ 197 0138 0A304BE5 		strb	r3, [fp, #-10]
+  46:../standalone_spi/cyfx_gpio_spi_standalone.c ****     if (timing->bitOrder == CYFX_SPI_BIT_ORDER_MSB_FIRST)
+ 198              		.loc 1 46 0
+ 199 013c 08301BE5 		ldr	r3, [fp, #-8]
+ 200 0140 0830D3E5 		ldrb	r3, [r3, #8]	@ zero_extendqisi2
+ 201 0144 000053E3 		cmp	r3, #0
+ 202 0148 0600001A 		bne	.L12
+  47:../standalone_spi/cyfx_gpio_spi_standalone.c ****     {
+  48:../standalone_spi/cyfx_gpio_spi_standalone.c ****         return (uint8_t)((bitCount - 1u) - i);
+ 203              		.loc 1 48 0
+ 204 014c 09205BE5 		ldrb	r2, [fp, #-9]
+ 205 0150 0A305BE5 		ldrb	r3, [fp, #-10]
+ 206 0154 023063E0 		rsb	r3, r3, r2
+ 207 0158 FF3003E2 		and	r3, r3, #255
+ 208 015c 013043E2 		sub	r3, r3, #1
+ 209 0160 FF3003E2 		and	r3, r3, #255
+ 210 0164 000000EA 		b	.L13
+ 211              	.L12:
+  49:../standalone_spi/cyfx_gpio_spi_standalone.c ****     }
+  50:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+  51:../standalone_spi/cyfx_gpio_spi_standalone.c ****     return i;
+ 212              		.loc 1 51 0
+ 213 0168 0A305BE5 		ldrb	r3, [fp, #-10]	@ zero_extendqisi2
+ 214              	.L13:
+  52:../standalone_spi/cyfx_gpio_spi_standalone.c **** }
+ 215              		.loc 1 52 0
+ 216 016c 0300A0E1 		mov	r0, r3
+ 217 0170 00D04BE2 		sub	sp, fp, #0
+ 218              		@ sp needed
+ 219 0174 04B09DE4 		ldr	fp, [sp], #4
+ 220 0178 1EFF2FE1 		bx	lr
+ 221              		.cfi_endproc
+ 222              	.LFE4:
+ 224              		.align	2
+ 225              		.global	CyFxGpioSpiConfigurePins
+ 227              	CyFxGpioSpiConfigurePins:
+ 228              	.LFB5:
+  53:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+  54:../standalone_spi/cyfx_gpio_spi_standalone.c **** CyU3PReturnStatus_t
+  55:../standalone_spi/cyfx_gpio_spi_standalone.c **** CyFxGpioSpiConfigurePins (const CyFxGpioSpiPinMap_t *pinMap)
+  56:../standalone_spi/cyfx_gpio_spi_standalone.c **** {
+ 229              		.loc 1 56 0
+ 230              		.cfi_startproc
+ 231              		@ args = 0, pretend = 0, frame = 32
+ 232              		@ frame_needed = 1, uses_anonymous_args = 0
+ 233 017c 00482DE9 		stmfd	sp!, {fp, lr}
+ 234              	.LCFI10:
+ 235              		.cfi_def_cfa_offset 8
+ 236              		.cfi_offset 11, -8
+ 237              		.cfi_offset 14, -4
+ 238 0180 04B08DE2 		add	fp, sp, #4
+ 239              	.LCFI11:
+ 240              		.cfi_def_cfa 11, 4
+ 241 0184 20D04DE2 		sub	sp, sp, #32
+ 242 0188 20000BE5 		str	r0, [fp, #-32]
+  57:../standalone_spi/cyfx_gpio_spi_standalone.c ****     CyU3PGpioSimpleConfig_t cfg;
+  58:../standalone_spi/cyfx_gpio_spi_standalone.c ****     CyU3PReturnStatus_t status;
+  59:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+  60:../standalone_spi/cyfx_gpio_spi_standalone.c ****     if (pinMap == 0)
+ 243              		.loc 1 60 0
+ 244 018c 20301BE5 		ldr	r3, [fp, #-32]
+ 245 0190 000053E3 		cmp	r3, #0
+ 246 0194 0100001A 		bne	.L15
+  61:../standalone_spi/cyfx_gpio_spi_standalone.c ****     {
+  62:../standalone_spi/cyfx_gpio_spi_standalone.c ****         return CY_U3P_ERROR_BAD_ARGUMENT;
+ 247              		.loc 1 62 0
+ 248 0198 4030A0E3 		mov	r3, #64
+ 249 019c 440000EA 		b	.L20
+ 250              	.L15:
+  63:../standalone_spi/cyfx_gpio_spi_standalone.c ****     }
+  64:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+  65:../standalone_spi/cyfx_gpio_spi_standalone.c ****     CyU3PMemSet ((uint8_t *)&cfg, 0, sizeof(cfg));
+ 251              		.loc 1 65 0
+ 252 01a0 1C304BE2 		sub	r3, fp, #28
+ 253 01a4 0300A0E1 		mov	r0, r3
+ 254 01a8 0010A0E3 		mov	r1, #0
+ 255 01ac 1420A0E3 		mov	r2, #20
+ 256 01b0 FEFFFFEB 		bl	CyU3PMemSet
+  66:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+  67:../standalone_spi/cyfx_gpio_spi_standalone.c ****     cfg.outValue = CyFalse;
+ 257              		.loc 1 67 0
+ 258 01b4 0030A0E3 		mov	r3, #0
+ 259 01b8 1C300BE5 		str	r3, [fp, #-28]
+  68:../standalone_spi/cyfx_gpio_spi_standalone.c ****     cfg.driveLowEn = CyTrue;
+ 260              		.loc 1 68 0
+ 261 01bc 0130A0E3 		mov	r3, #1
+ 262 01c0 18300BE5 		str	r3, [fp, #-24]
+  69:../standalone_spi/cyfx_gpio_spi_standalone.c ****     cfg.driveHighEn = CyTrue;
+ 263              		.loc 1 69 0
+ 264 01c4 0130A0E3 		mov	r3, #1
+ 265 01c8 14300BE5 		str	r3, [fp, #-20]
+  70:../standalone_spi/cyfx_gpio_spi_standalone.c ****     cfg.inputEn = CyFalse;
+ 266              		.loc 1 70 0
+ 267 01cc 0030A0E3 		mov	r3, #0
+ 268 01d0 10300BE5 		str	r3, [fp, #-16]
+  71:../standalone_spi/cyfx_gpio_spi_standalone.c ****     cfg.intrMode = CY_U3P_GPIO_NO_INTR;
+ 269              		.loc 1 71 0
+ 270 01d4 0030A0E3 		mov	r3, #0
+ 271 01d8 0C304BE5 		strb	r3, [fp, #-12]
+  72:../standalone_spi/cyfx_gpio_spi_standalone.c ****     status = CyU3PGpioSetSimpleConfig (pinMap->clk, &cfg);
+ 272              		.loc 1 72 0
+ 273 01dc 20301BE5 		ldr	r3, [fp, #-32]
+ 274 01e0 0020D3E5 		ldrb	r2, [r3]	@ zero_extendqisi2
+ 275 01e4 1C304BE2 		sub	r3, fp, #28
+ 276 01e8 0200A0E1 		mov	r0, r2
+ 277 01ec 0310A0E1 		mov	r1, r3
+ 278 01f0 FEFFFFEB 		bl	CyU3PGpioSetSimpleConfig
+ 279 01f4 08000BE5 		str	r0, [fp, #-8]
+  73:../standalone_spi/cyfx_gpio_spi_standalone.c ****     if (status != CY_U3P_SUCCESS)
+ 280              		.loc 1 73 0
+ 281 01f8 08301BE5 		ldr	r3, [fp, #-8]
+ 282 01fc 000053E3 		cmp	r3, #0
+ 283 0200 0100000A 		beq	.L17
+  74:../standalone_spi/cyfx_gpio_spi_standalone.c ****     {
+  75:../standalone_spi/cyfx_gpio_spi_standalone.c ****         return status;
+ 284              		.loc 1 75 0
+ 285 0204 08301BE5 		ldr	r3, [fp, #-8]
+ 286 0208 290000EA 		b	.L20
+ 287              	.L17:
+  76:../standalone_spi/cyfx_gpio_spi_standalone.c ****     }
+  77:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+  78:../standalone_spi/cyfx_gpio_spi_standalone.c ****     status = CyU3PGpioSetSimpleConfig (pinMap->mosi, &cfg);
+ 288              		.loc 1 78 0
+ 289 020c 20301BE5 		ldr	r3, [fp, #-32]
+ 290 0210 0120D3E5 		ldrb	r2, [r3, #1]	@ zero_extendqisi2
+ 291 0214 1C304BE2 		sub	r3, fp, #28
+ 292 0218 0200A0E1 		mov	r0, r2
+ 293 021c 0310A0E1 		mov	r1, r3
+ 294 0220 FEFFFFEB 		bl	CyU3PGpioSetSimpleConfig
+ 295 0224 08000BE5 		str	r0, [fp, #-8]
+  79:../standalone_spi/cyfx_gpio_spi_standalone.c ****     if (status != CY_U3P_SUCCESS)
+ 296              		.loc 1 79 0
+ 297 0228 08301BE5 		ldr	r3, [fp, #-8]
+ 298 022c 000053E3 		cmp	r3, #0
+ 299 0230 0100000A 		beq	.L18
+  80:../standalone_spi/cyfx_gpio_spi_standalone.c ****     {
+  81:../standalone_spi/cyfx_gpio_spi_standalone.c ****         return status;
+ 300              		.loc 1 81 0
+ 301 0234 08301BE5 		ldr	r3, [fp, #-8]
+ 302 0238 1D0000EA 		b	.L20
+ 303              	.L18:
+  82:../standalone_spi/cyfx_gpio_spi_standalone.c ****     }
+  83:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+  84:../standalone_spi/cyfx_gpio_spi_standalone.c ****     cfg.outValue = CyTrue;
+ 304              		.loc 1 84 0
+ 305 023c 0130A0E3 		mov	r3, #1
+ 306 0240 1C300BE5 		str	r3, [fp, #-28]
+  85:../standalone_spi/cyfx_gpio_spi_standalone.c ****     status = CyU3PGpioSetSimpleConfig (pinMap->cs, &cfg);
+ 307              		.loc 1 85 0
+ 308 0244 20301BE5 		ldr	r3, [fp, #-32]
+ 309 0248 0320D3E5 		ldrb	r2, [r3, #3]	@ zero_extendqisi2
+ 310 024c 1C304BE2 		sub	r3, fp, #28
+ 311 0250 0200A0E1 		mov	r0, r2
+ 312 0254 0310A0E1 		mov	r1, r3
+ 313 0258 FEFFFFEB 		bl	CyU3PGpioSetSimpleConfig
+ 314 025c 08000BE5 		str	r0, [fp, #-8]
+  86:../standalone_spi/cyfx_gpio_spi_standalone.c ****     if (status != CY_U3P_SUCCESS)
+ 315              		.loc 1 86 0
+ 316 0260 08301BE5 		ldr	r3, [fp, #-8]
+ 317 0264 000053E3 		cmp	r3, #0
+ 318 0268 0100000A 		beq	.L19
+  87:../standalone_spi/cyfx_gpio_spi_standalone.c ****     {
+  88:../standalone_spi/cyfx_gpio_spi_standalone.c ****         return status;
+ 319              		.loc 1 88 0
+ 320 026c 08301BE5 		ldr	r3, [fp, #-8]
+ 321 0270 0F0000EA 		b	.L20
+ 322              	.L19:
+  89:../standalone_spi/cyfx_gpio_spi_standalone.c ****     }
+  90:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+  91:../standalone_spi/cyfx_gpio_spi_standalone.c ****     cfg.outValue = CyFalse;
+ 323              		.loc 1 91 0
+ 324 0274 0030A0E3 		mov	r3, #0
+ 325 0278 1C300BE5 		str	r3, [fp, #-28]
+  92:../standalone_spi/cyfx_gpio_spi_standalone.c ****     cfg.driveLowEn = CyFalse;
+ 326              		.loc 1 92 0
+ 327 027c 0030A0E3 		mov	r3, #0
+ 328 0280 18300BE5 		str	r3, [fp, #-24]
+  93:../standalone_spi/cyfx_gpio_spi_standalone.c ****     cfg.driveHighEn = CyFalse;
+ 329              		.loc 1 93 0
+ 330 0284 0030A0E3 		mov	r3, #0
+ 331 0288 14300BE5 		str	r3, [fp, #-20]
+  94:../standalone_spi/cyfx_gpio_spi_standalone.c ****     cfg.inputEn = CyTrue;
+ 332              		.loc 1 94 0
+ 333 028c 0130A0E3 		mov	r3, #1
+ 334 0290 10300BE5 		str	r3, [fp, #-16]
+  95:../standalone_spi/cyfx_gpio_spi_standalone.c ****     status = CyU3PGpioSetSimpleConfig (pinMap->miso, &cfg);
+ 335              		.loc 1 95 0
+ 336 0294 20301BE5 		ldr	r3, [fp, #-32]
+ 337 0298 0220D3E5 		ldrb	r2, [r3, #2]	@ zero_extendqisi2
+ 338 029c 1C304BE2 		sub	r3, fp, #28
+ 339 02a0 0200A0E1 		mov	r0, r2
+ 340 02a4 0310A0E1 		mov	r1, r3
+ 341 02a8 FEFFFFEB 		bl	CyU3PGpioSetSimpleConfig
+ 342 02ac 08000BE5 		str	r0, [fp, #-8]
+  96:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+  97:../standalone_spi/cyfx_gpio_spi_standalone.c ****     return status;
+ 343              		.loc 1 97 0
+ 344 02b0 08301BE5 		ldr	r3, [fp, #-8]
+ 345              	.L20:
+  98:../standalone_spi/cyfx_gpio_spi_standalone.c **** }
+ 346              		.loc 1 98 0
+ 347 02b4 0300A0E1 		mov	r0, r3
+ 348 02b8 04D04BE2 		sub	sp, fp, #4
+ 349              		@ sp needed
+ 350 02bc 0088BDE8 		ldmfd	sp!, {fp, pc}
+ 351              		.cfi_endproc
+ 352              	.LFE5:
+ 354              		.align	2
+ 355              		.global	CyFxGpioSpiInit
+ 357              	CyFxGpioSpiInit:
+ 358              	.LFB6:
+  99:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 100:../standalone_spi/cyfx_gpio_spi_standalone.c **** CyU3PReturnStatus_t
+ 101:../standalone_spi/cyfx_gpio_spi_standalone.c **** CyFxGpioSpiInit (CyFxGpioSpiContext_t *ctx,
+ 102:../standalone_spi/cyfx_gpio_spi_standalone.c ****                  const CyFxGpioSpiPinMap_t *pinMap,
+ 103:../standalone_spi/cyfx_gpio_spi_standalone.c ****                  const CyFxGpioSpiTiming_t *timing)
+ 104:../standalone_spi/cyfx_gpio_spi_standalone.c **** {
+ 359              		.loc 1 104 0
+ 360              		.cfi_startproc
+ 361              		@ args = 0, pretend = 0, frame = 24
+ 362              		@ frame_needed = 1, uses_anonymous_args = 0
+ 363 02c0 00482DE9 		stmfd	sp!, {fp, lr}
+ 364              	.LCFI12:
+ 365              		.cfi_def_cfa_offset 8
+ 366              		.cfi_offset 11, -8
+ 367              		.cfi_offset 14, -4
+ 368 02c4 04B08DE2 		add	fp, sp, #4
+ 369              	.LCFI13:
+ 370              		.cfi_def_cfa 11, 4
+ 371 02c8 18D04DE2 		sub	sp, sp, #24
+ 372 02cc 10000BE5 		str	r0, [fp, #-16]
+ 373 02d0 14100BE5 		str	r1, [fp, #-20]
+ 374 02d4 18200BE5 		str	r2, [fp, #-24]
+ 105:../standalone_spi/cyfx_gpio_spi_standalone.c ****     CyU3PReturnStatus_t status;
+ 106:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 107:../standalone_spi/cyfx_gpio_spi_standalone.c ****     if ((ctx == 0) || (pinMap == 0) || (timing == 0))
+ 375              		.loc 1 107 0
+ 376 02d8 10301BE5 		ldr	r3, [fp, #-16]
+ 377 02dc 000053E3 		cmp	r3, #0
+ 378 02e0 0500000A 		beq	.L22
+ 379              		.loc 1 107 0 is_stmt 0 discriminator 1
+ 380 02e4 14301BE5 		ldr	r3, [fp, #-20]
+ 381 02e8 000053E3 		cmp	r3, #0
+ 382 02ec 0200000A 		beq	.L22
+ 383 02f0 18301BE5 		ldr	r3, [fp, #-24]
+ 384 02f4 000053E3 		cmp	r3, #0
+ 385 02f8 0100001A 		bne	.L23
+ 386              	.L22:
+ 108:../standalone_spi/cyfx_gpio_spi_standalone.c ****     {
+ 109:../standalone_spi/cyfx_gpio_spi_standalone.c ****         return CY_U3P_ERROR_BAD_ARGUMENT;
+ 387              		.loc 1 109 0 is_stmt 1
+ 388 02fc 4030A0E3 		mov	r3, #64
+ 389 0300 4D0000EA 		b	.L24
+ 390              	.L23:
+ 110:../standalone_spi/cyfx_gpio_spi_standalone.c ****     }
+ 111:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 112:../standalone_spi/cyfx_gpio_spi_standalone.c ****     CyU3PMemSet ((uint8_t *)ctx, 0, sizeof(*ctx));
+ 391              		.loc 1 112 0
+ 392 0304 10001BE5 		ldr	r0, [fp, #-16]
+ 393 0308 0010A0E3 		mov	r1, #0
+ 394 030c 5820A0E3 		mov	r2, #88
+ 395 0310 FEFFFFEB 		bl	CyU3PMemSet
+ 113:../standalone_spi/cyfx_gpio_spi_standalone.c ****     ctx->pinMap = *pinMap;
+ 396              		.loc 1 113 0
+ 397 0314 10201BE5 		ldr	r2, [fp, #-16]
+ 398 0318 14301BE5 		ldr	r3, [fp, #-20]
+ 399 031c 0210A0E1 		mov	r1, r2
+ 400 0320 0320A0E1 		mov	r2, r3
+ 401 0324 0430A0E3 		mov	r3, #4
+ 402 0328 0100A0E1 		mov	r0, r1
+ 403 032c 0210A0E1 		mov	r1, r2
+ 404 0330 0320A0E1 		mov	r2, r3
+ 405 0334 FEFFFFEB 		bl	memcpy
+ 114:../standalone_spi/cyfx_gpio_spi_standalone.c ****     ctx->timing = *timing;
+ 406              		.loc 1 114 0
+ 407 0338 10201BE5 		ldr	r2, [fp, #-16]
+ 408 033c 18301BE5 		ldr	r3, [fp, #-24]
+ 409 0340 04C082E2 		add	ip, r2, #4
+ 410 0344 03E0A0E1 		mov	lr, r3
+ 411 0348 0F00BEE8 		ldmia	lr!, {r0, r1, r2, r3}
+ 412 034c 0F00ACE8 		stmia	ip!, {r0, r1, r2, r3}
+ 413 0350 03009EE8 		ldmia	lr, {r0, r1}
+ 414 0354 03008CE8 		stmia	ip, {r0, r1}
+ 115:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 116:../standalone_spi/cyfx_gpio_spi_standalone.c ****     status = CyU3PMutexCreate (&ctx->lock, CyFalse);
+ 415              		.loc 1 116 0
+ 416 0358 10301BE5 		ldr	r3, [fp, #-16]
+ 417 035c 1C3083E2 		add	r3, r3, #28
+ 418 0360 0300A0E1 		mov	r0, r3
+ 419 0364 0010A0E3 		mov	r1, #0
+ 420 0368 0020A0E3 		mov	r2, #0
+ 421 036c 3830A0E3 		mov	r3, #56
+ 422 0370 FEFFFFEB 		bl	_txe_mutex_create
+ 423 0374 08000BE5 		str	r0, [fp, #-8]
+ 117:../standalone_spi/cyfx_gpio_spi_standalone.c ****     if (status != CY_U3P_SUCCESS)
+ 424              		.loc 1 117 0
+ 425 0378 08301BE5 		ldr	r3, [fp, #-8]
+ 426 037c 000053E3 		cmp	r3, #0
+ 427 0380 0100000A 		beq	.L25
+ 118:../standalone_spi/cyfx_gpio_spi_standalone.c ****     {
+ 119:../standalone_spi/cyfx_gpio_spi_standalone.c ****         return status;
+ 428              		.loc 1 119 0
+ 429 0384 08301BE5 		ldr	r3, [fp, #-8]
+ 430 0388 2B0000EA 		b	.L24
+ 431              	.L25:
+ 120:../standalone_spi/cyfx_gpio_spi_standalone.c ****     }
+ 121:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 122:../standalone_spi/cyfx_gpio_spi_standalone.c ****     status = CyFxGpioSpiConfigurePins (pinMap);
+ 432              		.loc 1 122 0
+ 433 038c 14001BE5 		ldr	r0, [fp, #-20]
+ 434 0390 FEFFFFEB 		bl	CyFxGpioSpiConfigurePins
+ 435 0394 08000BE5 		str	r0, [fp, #-8]
+ 123:../standalone_spi/cyfx_gpio_spi_standalone.c ****     if (status != CY_U3P_SUCCESS)
+ 436              		.loc 1 123 0
+ 437 0398 08301BE5 		ldr	r3, [fp, #-8]
+ 438 039c 000053E3 		cmp	r3, #0
+ 439 03a0 0500000A 		beq	.L26
+ 124:../standalone_spi/cyfx_gpio_spi_standalone.c ****     {
+ 125:../standalone_spi/cyfx_gpio_spi_standalone.c ****         CyU3PMutexDestroy (&ctx->lock);
+ 440              		.loc 1 125 0
+ 441 03a4 10301BE5 		ldr	r3, [fp, #-16]
+ 442 03a8 1C3083E2 		add	r3, r3, #28
+ 443 03ac 0300A0E1 		mov	r0, r3
+ 444 03b0 FEFFFFEB 		bl	_txe_mutex_delete
+ 126:../standalone_spi/cyfx_gpio_spi_standalone.c ****         return status;
+ 445              		.loc 1 126 0
+ 446 03b4 08301BE5 		ldr	r3, [fp, #-8]
+ 447 03b8 1F0000EA 		b	.L24
+ 448              	.L26:
+ 127:../standalone_spi/cyfx_gpio_spi_standalone.c ****     }
+ 128:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 129:../standalone_spi/cyfx_gpio_spi_standalone.c ****     status = CyFxGpioSpiSetClock (ctx, timing->cpolIdleHigh);
+ 449              		.loc 1 129 0
+ 450 03bc 18301BE5 		ldr	r3, [fp, #-24]
+ 451 03c0 003093E5 		ldr	r3, [r3]
+ 452 03c4 10001BE5 		ldr	r0, [fp, #-16]
+ 453 03c8 0310A0E1 		mov	r1, r3
+ 454 03cc 28FFFFEB 		bl	CyFxGpioSpiSetClock
+ 455 03d0 08000BE5 		str	r0, [fp, #-8]
+ 130:../standalone_spi/cyfx_gpio_spi_standalone.c ****     if (status != CY_U3P_SUCCESS)
+ 456              		.loc 1 130 0
+ 457 03d4 08301BE5 		ldr	r3, [fp, #-8]
+ 458 03d8 000053E3 		cmp	r3, #0
+ 459 03dc 0500000A 		beq	.L27
+ 131:../standalone_spi/cyfx_gpio_spi_standalone.c ****     {
+ 132:../standalone_spi/cyfx_gpio_spi_standalone.c ****         CyU3PMutexDestroy (&ctx->lock);
+ 460              		.loc 1 132 0
+ 461 03e0 10301BE5 		ldr	r3, [fp, #-16]
+ 462 03e4 1C3083E2 		add	r3, r3, #28
+ 463 03e8 0300A0E1 		mov	r0, r3
+ 464 03ec FEFFFFEB 		bl	_txe_mutex_delete
+ 133:../standalone_spi/cyfx_gpio_spi_standalone.c ****         return status;
+ 465              		.loc 1 133 0
+ 466 03f0 08301BE5 		ldr	r3, [fp, #-8]
+ 467 03f4 100000EA 		b	.L24
+ 468              	.L27:
+ 134:../standalone_spi/cyfx_gpio_spi_standalone.c ****     }
+ 135:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 136:../standalone_spi/cyfx_gpio_spi_standalone.c ****     status = CyFxGpioSpiSetCs (ctx, CyTrue);
+ 469              		.loc 1 136 0
+ 470 03f8 10001BE5 		ldr	r0, [fp, #-16]
+ 471 03fc 0110A0E3 		mov	r1, #1
+ 472 0400 37FFFFEB 		bl	CyFxGpioSpiSetCs
+ 473 0404 08000BE5 		str	r0, [fp, #-8]
+ 137:../standalone_spi/cyfx_gpio_spi_standalone.c ****     if (status != CY_U3P_SUCCESS)
+ 474              		.loc 1 137 0
+ 475 0408 08301BE5 		ldr	r3, [fp, #-8]
+ 476 040c 000053E3 		cmp	r3, #0
+ 477 0410 0500000A 		beq	.L28
+ 138:../standalone_spi/cyfx_gpio_spi_standalone.c ****     {
+ 139:../standalone_spi/cyfx_gpio_spi_standalone.c ****         CyU3PMutexDestroy (&ctx->lock);
+ 478              		.loc 1 139 0
+ 479 0414 10301BE5 		ldr	r3, [fp, #-16]
+ 480 0418 1C3083E2 		add	r3, r3, #28
+ 481 041c 0300A0E1 		mov	r0, r3
+ 482 0420 FEFFFFEB 		bl	_txe_mutex_delete
+ 140:../standalone_spi/cyfx_gpio_spi_standalone.c ****         return status;
+ 483              		.loc 1 140 0
+ 484 0424 08301BE5 		ldr	r3, [fp, #-8]
+ 485 0428 030000EA 		b	.L24
+ 486              	.L28:
+ 141:../standalone_spi/cyfx_gpio_spi_standalone.c ****     }
+ 142:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 143:../standalone_spi/cyfx_gpio_spi_standalone.c ****     ctx->initialized = CyTrue;
+ 487              		.loc 1 143 0
+ 488 042c 10301BE5 		ldr	r3, [fp, #-16]
+ 489 0430 0120A0E3 		mov	r2, #1
+ 490 0434 542083E5 		str	r2, [r3, #84]
+ 144:../standalone_spi/cyfx_gpio_spi_standalone.c ****     return CY_U3P_SUCCESS;
+ 491              		.loc 1 144 0
+ 492 0438 0030A0E3 		mov	r3, #0
+ 493              	.L24:
+ 145:../standalone_spi/cyfx_gpio_spi_standalone.c **** }
+ 494              		.loc 1 145 0
+ 495 043c 0300A0E1 		mov	r0, r3
+ 496 0440 04D04BE2 		sub	sp, fp, #4
+ 497              		@ sp needed
+ 498 0444 0088BDE8 		ldmfd	sp!, {fp, pc}
+ 499              		.cfi_endproc
+ 500              	.LFE6:
+ 502              		.align	2
+ 503              		.global	CyFxGpioSpiDeInit
+ 505              	CyFxGpioSpiDeInit:
+ 506              	.LFB7:
+ 146:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 147:../standalone_spi/cyfx_gpio_spi_standalone.c **** void
+ 148:../standalone_spi/cyfx_gpio_spi_standalone.c **** CyFxGpioSpiDeInit (CyFxGpioSpiContext_t *ctx)
+ 149:../standalone_spi/cyfx_gpio_spi_standalone.c **** {
+ 507              		.loc 1 149 0
+ 508              		.cfi_startproc
+ 509              		@ args = 0, pretend = 0, frame = 8
+ 510              		@ frame_needed = 1, uses_anonymous_args = 0
+ 511 0448 00482DE9 		stmfd	sp!, {fp, lr}
+ 512              	.LCFI14:
+ 513              		.cfi_def_cfa_offset 8
+ 514              		.cfi_offset 11, -8
+ 515              		.cfi_offset 14, -4
+ 516 044c 04B08DE2 		add	fp, sp, #4
+ 517              	.LCFI15:
+ 518              		.cfi_def_cfa 11, 4
+ 519 0450 08D04DE2 		sub	sp, sp, #8
+ 520 0454 08000BE5 		str	r0, [fp, #-8]
+ 150:../standalone_spi/cyfx_gpio_spi_standalone.c ****     if ((ctx == 0) || (ctx->initialized == CyFalse))
+ 521              		.loc 1 150 0
+ 522 0458 08301BE5 		ldr	r3, [fp, #-8]
+ 523 045c 000053E3 		cmp	r3, #0
+ 524 0460 0300000A 		beq	.L30
+ 525              		.loc 1 150 0 is_stmt 0 discriminator 1
+ 526 0464 08301BE5 		ldr	r3, [fp, #-8]
+ 527 0468 543093E5 		ldr	r3, [r3, #84]
+ 528 046c 000053E3 		cmp	r3, #0
+ 529 0470 0000001A 		bne	.L31
+ 530              	.L30:
+ 151:../standalone_spi/cyfx_gpio_spi_standalone.c ****     {
+ 152:../standalone_spi/cyfx_gpio_spi_standalone.c ****         return;
+ 531              		.loc 1 152 0 is_stmt 1
+ 532 0474 120000EA 		b	.L29
+ 533              	.L31:
+ 153:../standalone_spi/cyfx_gpio_spi_standalone.c ****     }
+ 154:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 155:../standalone_spi/cyfx_gpio_spi_standalone.c ****     CyU3PGpioSetValue (ctx->pinMap.cs, CyTrue);
+ 534              		.loc 1 155 0
+ 535 0478 08301BE5 		ldr	r3, [fp, #-8]
+ 536 047c 0330D3E5 		ldrb	r3, [r3, #3]	@ zero_extendqisi2
+ 537 0480 0300A0E1 		mov	r0, r3
+ 538 0484 0110A0E3 		mov	r1, #1
+ 539 0488 FEFFFFEB 		bl	CyU3PGpioSetValue
+ 156:../standalone_spi/cyfx_gpio_spi_standalone.c ****     CyU3PGpioSetValue (ctx->pinMap.clk, ctx->timing.cpolIdleHigh);
+ 540              		.loc 1 156 0
+ 541 048c 08301BE5 		ldr	r3, [fp, #-8]
+ 542 0490 0020D3E5 		ldrb	r2, [r3]	@ zero_extendqisi2
+ 543 0494 08301BE5 		ldr	r3, [fp, #-8]
+ 544 0498 043093E5 		ldr	r3, [r3, #4]
+ 545 049c 0200A0E1 		mov	r0, r2
+ 546 04a0 0310A0E1 		mov	r1, r3
+ 547 04a4 FEFFFFEB 		bl	CyU3PGpioSetValue
+ 157:../standalone_spi/cyfx_gpio_spi_standalone.c ****     CyU3PMutexDestroy (&ctx->lock);
+ 548              		.loc 1 157 0
+ 549 04a8 08301BE5 		ldr	r3, [fp, #-8]
+ 550 04ac 1C3083E2 		add	r3, r3, #28
+ 551 04b0 0300A0E1 		mov	r0, r3
+ 552 04b4 FEFFFFEB 		bl	_txe_mutex_delete
+ 158:../standalone_spi/cyfx_gpio_spi_standalone.c ****     ctx->initialized = CyFalse;
+ 553              		.loc 1 158 0
+ 554 04b8 08301BE5 		ldr	r3, [fp, #-8]
+ 555 04bc 0020A0E3 		mov	r2, #0
+ 556 04c0 542083E5 		str	r2, [r3, #84]
+ 557              	.L29:
+ 159:../standalone_spi/cyfx_gpio_spi_standalone.c **** }
+ 558              		.loc 1 159 0
+ 559 04c4 04D04BE2 		sub	sp, fp, #4
+ 560              		@ sp needed
+ 561 04c8 0088BDE8 		ldmfd	sp!, {fp, pc}
+ 562              		.cfi_endproc
+ 563              	.LFE7:
+ 565              		.global	__aeabi_uidiv
+ 566              		.align	2
+ 567              		.global	CyFxGpioSpiSetBitRateHint
+ 569              	CyFxGpioSpiSetBitRateHint:
+ 570              	.LFB8:
+ 160:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 161:../standalone_spi/cyfx_gpio_spi_standalone.c **** CyU3PReturnStatus_t
+ 162:../standalone_spi/cyfx_gpio_spi_standalone.c **** CyFxGpioSpiSetBitRateHint (CyFxGpioSpiContext_t *ctx,
+ 163:../standalone_spi/cyfx_gpio_spi_standalone.c ****                            uint32_t bitRateHz,
+ 164:../standalone_spi/cyfx_gpio_spi_standalone.c ****                            uint32_t subUsDelayCycles)
+ 165:../standalone_spi/cyfx_gpio_spi_standalone.c **** {
+ 571              		.loc 1 165 0
+ 572              		.cfi_startproc
+ 573              		@ args = 0, pretend = 0, frame = 16
+ 574              		@ frame_needed = 1, uses_anonymous_args = 0
+ 575 04cc 00482DE9 		stmfd	sp!, {fp, lr}
+ 576              	.LCFI16:
+ 577              		.cfi_def_cfa_offset 8
+ 578              		.cfi_offset 11, -8
+ 579              		.cfi_offset 14, -4
+ 580 04d0 04B08DE2 		add	fp, sp, #4
+ 581              	.LCFI17:
+ 582              		.cfi_def_cfa 11, 4
+ 583 04d4 10D04DE2 		sub	sp, sp, #16
+ 584 04d8 08000BE5 		str	r0, [fp, #-8]
+ 585 04dc 0C100BE5 		str	r1, [fp, #-12]
+ 586 04e0 10200BE5 		str	r2, [fp, #-16]
+ 166:../standalone_spi/cyfx_gpio_spi_standalone.c ****     if ((ctx == 0) || (ctx->initialized == CyFalse) || (bitRateHz == 0u))
+ 587              		.loc 1 166 0
+ 588 04e4 08301BE5 		ldr	r3, [fp, #-8]
+ 589 04e8 000053E3 		cmp	r3, #0
+ 590 04ec 0600000A 		beq	.L34
+ 591              		.loc 1 166 0 is_stmt 0 discriminator 1
+ 592 04f0 08301BE5 		ldr	r3, [fp, #-8]
+ 593 04f4 543093E5 		ldr	r3, [r3, #84]
+ 594 04f8 000053E3 		cmp	r3, #0
+ 595 04fc 0200000A 		beq	.L34
+ 596 0500 0C301BE5 		ldr	r3, [fp, #-12]
+ 597 0504 000053E3 		cmp	r3, #0
+ 598 0508 0100001A 		bne	.L35
+ 599              	.L34:
+ 167:../standalone_spi/cyfx_gpio_spi_standalone.c ****     {
+ 168:../standalone_spi/cyfx_gpio_spi_standalone.c ****         return CY_U3P_ERROR_BAD_ARGUMENT;
+ 600              		.loc 1 168 0 is_stmt 1
+ 601 050c 4030A0E3 		mov	r3, #64
+ 602 0510 180000EA 		b	.L36
+ 603              	.L35:
+ 169:../standalone_spi/cyfx_gpio_spi_standalone.c ****     }
+ 170:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 171:../standalone_spi/cyfx_gpio_spi_standalone.c ****     if (bitRateHz <= 500000u)
+ 604              		.loc 1 171 0
+ 605 0514 0C201BE5 		ldr	r2, [fp, #-12]
+ 606 0518 64309FE5 		ldr	r3, .L39
+ 607 051c 030052E1 		cmp	r2, r3
+ 608 0520 0D00008A 		bhi	.L37
+ 172:../standalone_spi/cyfx_gpio_spi_standalone.c ****     {
+ 173:../standalone_spi/cyfx_gpio_spi_standalone.c ****         ctx->timing.halfPeriodUs = (500000u + bitRateHz - 1u) / bitRateHz;
+ 609              		.loc 1 173 0
+ 610 0524 0C201BE5 		ldr	r2, [fp, #-12]
+ 611 0528 58309FE5 		ldr	r3, .L39+4
+ 612 052c 033082E0 		add	r3, r2, r3
+ 613 0530 0300A0E1 		mov	r0, r3
+ 614 0534 0C101BE5 		ldr	r1, [fp, #-12]
+ 615 0538 FEFFFFEB 		bl	__aeabi_uidiv
+ 616 053c 0030A0E1 		mov	r3, r0
+ 617 0540 0320A0E1 		mov	r2, r3
+ 618 0544 08301BE5 		ldr	r3, [fp, #-8]
+ 619 0548 102083E5 		str	r2, [r3, #16]
+ 174:../standalone_spi/cyfx_gpio_spi_standalone.c ****         ctx->timing.edgeDelayCycles = 0u;
+ 620              		.loc 1 174 0
+ 621 054c 08301BE5 		ldr	r3, [fp, #-8]
+ 622 0550 0020A0E3 		mov	r2, #0
+ 623 0554 142083E5 		str	r2, [r3, #20]
+ 624 0558 050000EA 		b	.L38
+ 625              	.L37:
+ 175:../standalone_spi/cyfx_gpio_spi_standalone.c ****     }
+ 176:../standalone_spi/cyfx_gpio_spi_standalone.c ****     else
+ 177:../standalone_spi/cyfx_gpio_spi_standalone.c ****     {
+ 178:../standalone_spi/cyfx_gpio_spi_standalone.c ****         ctx->timing.halfPeriodUs = 0u;
+ 626              		.loc 1 178 0
+ 627 055c 08301BE5 		ldr	r3, [fp, #-8]
+ 628 0560 0020A0E3 		mov	r2, #0
+ 629 0564 102083E5 		str	r2, [r3, #16]
+ 179:../standalone_spi/cyfx_gpio_spi_standalone.c ****         ctx->timing.edgeDelayCycles = subUsDelayCycles;
+ 630              		.loc 1 179 0
+ 631 0568 08301BE5 		ldr	r3, [fp, #-8]
+ 632 056c 10201BE5 		ldr	r2, [fp, #-16]
+ 633 0570 142083E5 		str	r2, [r3, #20]
+ 634              	.L38:
+ 180:../standalone_spi/cyfx_gpio_spi_standalone.c ****     }
+ 181:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 182:../standalone_spi/cyfx_gpio_spi_standalone.c ****     return CY_U3P_SUCCESS;
+ 635              		.loc 1 182 0
+ 636 0574 0030A0E3 		mov	r3, #0
+ 637              	.L36:
+ 183:../standalone_spi/cyfx_gpio_spi_standalone.c **** }
+ 638              		.loc 1 183 0
+ 639 0578 0300A0E1 		mov	r0, r3
+ 640 057c 04D04BE2 		sub	sp, fp, #4
+ 641              		@ sp needed
+ 642 0580 0088BDE8 		ldmfd	sp!, {fp, pc}
+ 643              	.L40:
+ 644              		.align	2
+ 645              	.L39:
+ 646 0584 20A10700 		.word	500000
+ 647 0588 1FA10700 		.word	499999
+ 648              		.cfi_endproc
+ 649              	.LFE8:
+ 651              		.align	2
+ 652              		.global	CyFxGpioSpiTransferFrame
+ 654              	CyFxGpioSpiTransferFrame:
+ 655              	.LFB9:
+ 184:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 185:../standalone_spi/cyfx_gpio_spi_standalone.c **** CyU3PReturnStatus_t
+ 186:../standalone_spi/cyfx_gpio_spi_standalone.c **** CyFxGpioSpiTransferFrame (CyFxGpioSpiContext_t *ctx,
+ 187:../standalone_spi/cyfx_gpio_spi_standalone.c ****                           const CyFxGpioSpiFrame_t *frame,
+ 188:../standalone_spi/cyfx_gpio_spi_standalone.c ****                           uint32_t waitOption)
+ 189:../standalone_spi/cyfx_gpio_spi_standalone.c **** {
+ 656              		.loc 1 189 0
+ 657              		.cfi_startproc
+ 658              		@ args = 0, pretend = 0, frame = 56
+ 659              		@ frame_needed = 1, uses_anonymous_args = 0
+ 660 058c 00482DE9 		stmfd	sp!, {fp, lr}
+ 661              	.LCFI18:
+ 662              		.cfi_def_cfa_offset 8
+ 663              		.cfi_offset 11, -8
+ 664              		.cfi_offset 14, -4
+ 665 0590 04B08DE2 		add	fp, sp, #4
+ 666              	.LCFI19:
+ 667              		.cfi_def_cfa 11, 4
+ 668 0594 38D04DE2 		sub	sp, sp, #56
+ 669 0598 30000BE5 		str	r0, [fp, #-48]
+ 670 059c 34100BE5 		str	r1, [fp, #-52]
+ 671 05a0 38200BE5 		str	r2, [fp, #-56]
+ 190:../standalone_spi/cyfx_gpio_spi_standalone.c ****     CyU3PReturnStatus_t status;
+ 191:../standalone_spi/cyfx_gpio_spi_standalone.c ****     uint32_t rx = 0u;
+ 672              		.loc 1 191 0
+ 673 05a4 0030A0E3 		mov	r3, #0
+ 674 05a8 0C300BE5 		str	r3, [fp, #-12]
+ 192:../standalone_spi/cyfx_gpio_spi_standalone.c ****     uint8_t i;
+ 193:../standalone_spi/cyfx_gpio_spi_standalone.c ****     CyBool_t miso = CyFalse;
+ 675              		.loc 1 193 0
+ 676 05ac 0030A0E3 		mov	r3, #0
+ 677 05b0 28300BE5 		str	r3, [fp, #-40]
+ 194:../standalone_spi/cyfx_gpio_spi_standalone.c ****     CyBool_t idleLevel;
+ 195:../standalone_spi/cyfx_gpio_spi_standalone.c ****     CyBool_t activeLevel;
+ 196:../standalone_spi/cyfx_gpio_spi_standalone.c ****     uint32_t irqState = 0u;
+ 678              		.loc 1 196 0
+ 679 05b4 0030A0E3 		mov	r3, #0
+ 680 05b8 14300BE5 		str	r3, [fp, #-20]
+ 197:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 198:../standalone_spi/cyfx_gpio_spi_standalone.c ****     if ((ctx == 0) || (frame == 0) || (ctx->initialized == CyFalse))
+ 681              		.loc 1 198 0
+ 682 05bc 30301BE5 		ldr	r3, [fp, #-48]
+ 683 05c0 000053E3 		cmp	r3, #0
+ 684 05c4 0600000A 		beq	.L42
+ 685              		.loc 1 198 0 is_stmt 0 discriminator 1
+ 686 05c8 34301BE5 		ldr	r3, [fp, #-52]
+ 687 05cc 000053E3 		cmp	r3, #0
+ 688 05d0 0300000A 		beq	.L42
+ 689 05d4 30301BE5 		ldr	r3, [fp, #-48]
+ 690 05d8 543093E5 		ldr	r3, [r3, #84]
+ 691 05dc 000053E3 		cmp	r3, #0
+ 692 05e0 0100001A 		bne	.L43
+ 693              	.L42:
+ 199:../standalone_spi/cyfx_gpio_spi_standalone.c ****     {
+ 200:../standalone_spi/cyfx_gpio_spi_standalone.c ****         return CY_U3P_ERROR_BAD_ARGUMENT;
+ 694              		.loc 1 200 0 is_stmt 1
+ 695 05e4 4030A0E3 		mov	r3, #64
+ 696 05e8 E70000EA 		b	.L68
+ 697              	.L43:
+ 201:../standalone_spi/cyfx_gpio_spi_standalone.c ****     }
+ 202:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 203:../standalone_spi/cyfx_gpio_spi_standalone.c ****     if ((frame->bitCount < CYFX_SPI_MIN_BITCOUNT) || (frame->bitCount > CYFX_SPI_MAX_BITCOUNT))
+ 698              		.loc 1 203 0
+ 699 05ec 34301BE5 		ldr	r3, [fp, #-52]
+ 700 05f0 0830D3E5 		ldrb	r3, [r3, #8]	@ zero_extendqisi2
+ 701 05f4 000053E3 		cmp	r3, #0
+ 702 05f8 0300000A 		beq	.L45
+ 703              		.loc 1 203 0 is_stmt 0 discriminator 1
+ 704 05fc 34301BE5 		ldr	r3, [fp, #-52]
+ 705 0600 0830D3E5 		ldrb	r3, [r3, #8]	@ zero_extendqisi2
+ 706 0604 200053E3 		cmp	r3, #32
+ 707 0608 0100009A 		bls	.L46
+ 708              	.L45:
+ 204:../standalone_spi/cyfx_gpio_spi_standalone.c ****     {
+ 205:../standalone_spi/cyfx_gpio_spi_standalone.c ****         return CY_U3P_ERROR_BAD_ARGUMENT;
+ 709              		.loc 1 205 0 is_stmt 1
+ 710 060c 4030A0E3 		mov	r3, #64
+ 711 0610 DD0000EA 		b	.L68
+ 712              	.L46:
+ 206:../standalone_spi/cyfx_gpio_spi_standalone.c ****     }
+ 207:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 208:../standalone_spi/cyfx_gpio_spi_standalone.c ****     status = CyU3PMutexGet (&ctx->lock, waitOption);
+ 713              		.loc 1 208 0
+ 714 0614 30301BE5 		ldr	r3, [fp, #-48]
+ 715 0618 1C3083E2 		add	r3, r3, #28
+ 716 061c 0300A0E1 		mov	r0, r3
+ 717 0620 38101BE5 		ldr	r1, [fp, #-56]
+ 718 0624 FEFFFFEB 		bl	_txe_mutex_get
+ 719 0628 08000BE5 		str	r0, [fp, #-8]
+ 209:../standalone_spi/cyfx_gpio_spi_standalone.c ****     if (status != CY_U3P_SUCCESS)
+ 720              		.loc 1 209 0
+ 721 062c 08301BE5 		ldr	r3, [fp, #-8]
+ 722 0630 000053E3 		cmp	r3, #0
+ 723 0634 0100000A 		beq	.L47
+ 210:../standalone_spi/cyfx_gpio_spi_standalone.c ****     {
+ 211:../standalone_spi/cyfx_gpio_spi_standalone.c ****         return status;
+ 724              		.loc 1 211 0
+ 725 0638 08301BE5 		ldr	r3, [fp, #-8]
+ 726 063c D20000EA 		b	.L68
+ 727              	.L47:
+ 212:../standalone_spi/cyfx_gpio_spi_standalone.c ****     }
+ 213:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 214:../standalone_spi/cyfx_gpio_spi_standalone.c ****     idleLevel = ctx->timing.cpolIdleHigh;
+ 728              		.loc 1 214 0
+ 729 0640 30301BE5 		ldr	r3, [fp, #-48]
+ 730 0644 043093E5 		ldr	r3, [r3, #4]
+ 731 0648 18300BE5 		str	r3, [fp, #-24]
+ 215:../standalone_spi/cyfx_gpio_spi_standalone.c ****     activeLevel = (idleLevel == CyTrue) ? CyFalse : CyTrue;
+ 732              		.loc 1 215 0
+ 733 064c 18301BE5 		ldr	r3, [fp, #-24]
+ 734 0650 010053E3 		cmp	r3, #1
+ 735 0654 0030A003 		moveq	r3, #0
+ 736 0658 0130A013 		movne	r3, #1
+ 737 065c FF3003E2 		and	r3, r3, #255
+ 738 0660 1C300BE5 		str	r3, [fp, #-28]
+ 216:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 217:../standalone_spi/cyfx_gpio_spi_standalone.c ****     status = CyFxGpioSpiSetCs (ctx, CyFalse);
+ 739              		.loc 1 217 0
+ 740 0664 30001BE5 		ldr	r0, [fp, #-48]
+ 741 0668 0010A0E3 		mov	r1, #0
+ 742 066c 9CFEFFEB 		bl	CyFxGpioSpiSetCs
+ 743 0670 08000BE5 		str	r0, [fp, #-8]
+ 218:../standalone_spi/cyfx_gpio_spi_standalone.c ****     if (status != CY_U3P_SUCCESS)
+ 744              		.loc 1 218 0
+ 745 0674 08301BE5 		ldr	r3, [fp, #-8]
+ 746 0678 000053E3 		cmp	r3, #0
+ 747 067c 0500000A 		beq	.L48
+ 219:../standalone_spi/cyfx_gpio_spi_standalone.c ****     {
+ 220:../standalone_spi/cyfx_gpio_spi_standalone.c ****         CyU3PMutexPut (&ctx->lock);
+ 748              		.loc 1 220 0
+ 749 0680 30301BE5 		ldr	r3, [fp, #-48]
+ 750 0684 1C3083E2 		add	r3, r3, #28
+ 751 0688 0300A0E1 		mov	r0, r3
+ 752 068c FEFFFFEB 		bl	_txe_mutex_put
+ 221:../standalone_spi/cyfx_gpio_spi_standalone.c ****         return status;
+ 753              		.loc 1 221 0
+ 754 0690 08301BE5 		ldr	r3, [fp, #-8]
+ 755 0694 BC0000EA 		b	.L68
+ 756              	.L48:
+ 222:../standalone_spi/cyfx_gpio_spi_standalone.c ****     }
+ 223:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 224:../standalone_spi/cyfx_gpio_spi_standalone.c ****     if ((frame->useShortCriticalSection == CyTrue) &&
+ 757              		.loc 1 224 0
+ 758 0698 34301BE5 		ldr	r3, [fp, #-52]
+ 759 069c 103093E5 		ldr	r3, [r3, #16]
+ 760 06a0 010053E3 		cmp	r3, #1
+ 761 06a4 0600001A 		bne	.L49
+ 225:../standalone_spi/cyfx_gpio_spi_standalone.c ****         (ctx->timing.allowShortCriticalSection == CyTrue))
+ 762              		.loc 1 225 0 discriminator 1
+ 763 06a8 30301BE5 		ldr	r3, [fp, #-48]
+ 764 06ac 183093E5 		ldr	r3, [r3, #24]
+ 224:../standalone_spi/cyfx_gpio_spi_standalone.c ****         (ctx->timing.allowShortCriticalSection == CyTrue))
+ 765              		.loc 1 224 0 discriminator 1
+ 766 06b0 010053E3 		cmp	r3, #1
+ 767 06b4 0200001A 		bne	.L49
+ 768              	.LBB2:
+ 226:../standalone_spi/cyfx_gpio_spi_standalone.c ****     {
+ 227:../standalone_spi/cyfx_gpio_spi_standalone.c ****         irqState = CyU3PEnterCriticalSection ();
+ 769              		.loc 1 227 0
+ 770 06b8 FEFFFFEB 		bl	CyU3PEnterCriticalSection
+ 771 06bc 0030A0E1 		mov	r3, r0
+ 772 06c0 14300BE5 		str	r3, [fp, #-20]
+ 773              	.L49:
+ 774              	.LBE2:
+ 228:../standalone_spi/cyfx_gpio_spi_standalone.c ****     }
+ 229:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 230:../standalone_spi/cyfx_gpio_spi_standalone.c ****     status = CyFxGpioSpiSetClock (ctx, idleLevel);
+ 775              		.loc 1 230 0
+ 776 06c4 30001BE5 		ldr	r0, [fp, #-48]
+ 777 06c8 18101BE5 		ldr	r1, [fp, #-24]
+ 778 06cc 68FEFFEB 		bl	CyFxGpioSpiSetClock
+ 779 06d0 08000BE5 		str	r0, [fp, #-8]
+ 231:../standalone_spi/cyfx_gpio_spi_standalone.c ****     if (status != CY_U3P_SUCCESS)
+ 780              		.loc 1 231 0
+ 781 06d4 08301BE5 		ldr	r3, [fp, #-8]
+ 782 06d8 000053E3 		cmp	r3, #0
+ 783 06dc 0D00000A 		beq	.L50
+ 232:../standalone_spi/cyfx_gpio_spi_standalone.c ****     {
+ 233:../standalone_spi/cyfx_gpio_spi_standalone.c ****         if (irqState != 0u)
+ 784              		.loc 1 233 0
+ 785 06e0 14301BE5 		ldr	r3, [fp, #-20]
+ 786 06e4 000053E3 		cmp	r3, #0
+ 787 06e8 0100000A 		beq	.L51
+ 788              	.LBB3:
+ 234:../standalone_spi/cyfx_gpio_spi_standalone.c ****         {
+ 235:../standalone_spi/cyfx_gpio_spi_standalone.c ****             CyU3PExitCriticalSection (irqState);
+ 789              		.loc 1 235 0
+ 790 06ec 14001BE5 		ldr	r0, [fp, #-20]
+ 791 06f0 FEFFFFEB 		bl	CyU3PExitCriticalSection
+ 792              	.L51:
+ 793              	.LBE3:
+ 236:../standalone_spi/cyfx_gpio_spi_standalone.c ****         }
+ 237:../standalone_spi/cyfx_gpio_spi_standalone.c ****         CyFxGpioSpiSetCs (ctx, CyTrue);
+ 794              		.loc 1 237 0
+ 795 06f4 30001BE5 		ldr	r0, [fp, #-48]
+ 796 06f8 0110A0E3 		mov	r1, #1
+ 797 06fc 78FEFFEB 		bl	CyFxGpioSpiSetCs
+ 238:../standalone_spi/cyfx_gpio_spi_standalone.c ****         CyU3PMutexPut (&ctx->lock);
+ 798              		.loc 1 238 0
+ 799 0700 30301BE5 		ldr	r3, [fp, #-48]
+ 800 0704 1C3083E2 		add	r3, r3, #28
+ 801 0708 0300A0E1 		mov	r0, r3
+ 802 070c FEFFFFEB 		bl	_txe_mutex_put
+ 239:../standalone_spi/cyfx_gpio_spi_standalone.c ****         return status;
+ 803              		.loc 1 239 0
+ 804 0710 08301BE5 		ldr	r3, [fp, #-8]
+ 805 0714 9C0000EA 		b	.L68
+ 806              	.L50:
+ 240:../standalone_spi/cyfx_gpio_spi_standalone.c ****     }
+ 241:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 242:../standalone_spi/cyfx_gpio_spi_standalone.c ****     for (i = 0u; i < frame->bitCount; ++i)
+ 807              		.loc 1 242 0
+ 808 0718 0030A0E3 		mov	r3, #0
+ 809 071c 0D304BE5 		strb	r3, [fp, #-13]
+ 810 0720 7B0000EA 		b	.L52
+ 811              	.L64:
+ 812              	.LBB4:
+ 243:../standalone_spi/cyfx_gpio_spi_standalone.c ****     {
+ 244:../standalone_spi/cyfx_gpio_spi_standalone.c ****         uint8_t bitIndex = CyFxGpioSpiBitIndex (&ctx->timing, frame->bitCount, i);
+ 813              		.loc 1 244 0
+ 814 0724 30301BE5 		ldr	r3, [fp, #-48]
+ 815 0728 041083E2 		add	r1, r3, #4
+ 816 072c 34301BE5 		ldr	r3, [fp, #-52]
+ 817 0730 0820D3E5 		ldrb	r2, [r3, #8]	@ zero_extendqisi2
+ 818 0734 0D305BE5 		ldrb	r3, [fp, #-13]	@ zero_extendqisi2
+ 819 0738 0100A0E1 		mov	r0, r1
+ 820 073c 0210A0E1 		mov	r1, r2
+ 821 0740 0320A0E1 		mov	r2, r3
+ 822 0744 74FEFFEB 		bl	CyFxGpioSpiBitIndex
+ 823 0748 0030A0E1 		mov	r3, r0
+ 824 074c 1D304BE5 		strb	r3, [fp, #-29]
+ 245:../standalone_spi/cyfx_gpio_spi_standalone.c ****         CyBool_t mosi = ((frame->txData >> bitIndex) & 0x1u) ? CyTrue : CyFalse;
+ 825              		.loc 1 245 0
+ 826 0750 34301BE5 		ldr	r3, [fp, #-52]
+ 827 0754 002093E5 		ldr	r2, [r3]
+ 828 0758 1D305BE5 		ldrb	r3, [fp, #-29]	@ zero_extendqisi2
+ 829 075c 3233A0E1 		mov	r3, r2, lsr r3
+ 830 0760 013003E2 		and	r3, r3, #1
+ 831 0764 000053E3 		cmp	r3, #0
+ 832 0768 0030A003 		moveq	r3, #0
+ 833 076c 0130A013 		movne	r3, #1
+ 834 0770 FF3003E2 		and	r3, r3, #255
+ 835 0774 24300BE5 		str	r3, [fp, #-36]
+ 246:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 247:../standalone_spi/cyfx_gpio_spi_standalone.c ****         if (ctx->timing.cphaSecondEdge == CyFalse)
+ 836              		.loc 1 247 0
+ 837 0778 30301BE5 		ldr	r3, [fp, #-48]
+ 838 077c 083093E5 		ldr	r3, [r3, #8]
+ 839 0780 000053E3 		cmp	r3, #0
+ 840 0784 2F00001A 		bne	.L53
+ 248:../standalone_spi/cyfx_gpio_spi_standalone.c ****         {
+ 249:../standalone_spi/cyfx_gpio_spi_standalone.c ****             status = CyFxGpioSpiSetMosi (ctx, mosi);
+ 841              		.loc 1 249 0
+ 842 0788 30001BE5 		ldr	r0, [fp, #-48]
+ 843 078c 24101BE5 		ldr	r1, [fp, #-36]
+ 844 0790 45FEFFEB 		bl	CyFxGpioSpiSetMosi
+ 845 0794 08000BE5 		str	r0, [fp, #-8]
+ 250:../standalone_spi/cyfx_gpio_spi_standalone.c ****             if (status != CY_U3P_SUCCESS)
+ 846              		.loc 1 250 0
+ 847 0798 08301BE5 		ldr	r3, [fp, #-8]
+ 848 079c 000053E3 		cmp	r3, #0
+ 849 07a0 0000000A 		beq	.L54
+ 251:../standalone_spi/cyfx_gpio_spi_standalone.c ****             {
+ 252:../standalone_spi/cyfx_gpio_spi_standalone.c ****                 break;
+ 850              		.loc 1 252 0
+ 851 07a4 5F0000EA 		b	.L55
+ 852              	.L54:
+ 253:../standalone_spi/cyfx_gpio_spi_standalone.c ****             }
+ 254:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 255:../standalone_spi/cyfx_gpio_spi_standalone.c ****             CyFxGpioSpiDelayHalfCycle (ctx);
+ 853              		.loc 1 255 0
+ 854 07a8 30001BE5 		ldr	r0, [fp, #-48]
+ 855 07ac 13FEFFEB 		bl	CyFxGpioSpiDelayHalfCycle
+ 256:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 257:../standalone_spi/cyfx_gpio_spi_standalone.c ****             status = CyFxGpioSpiSetClock (ctx, activeLevel);
+ 856              		.loc 1 257 0
+ 857 07b0 30001BE5 		ldr	r0, [fp, #-48]
+ 858 07b4 1C101BE5 		ldr	r1, [fp, #-28]
+ 859 07b8 2DFEFFEB 		bl	CyFxGpioSpiSetClock
+ 860 07bc 08000BE5 		str	r0, [fp, #-8]
+ 258:../standalone_spi/cyfx_gpio_spi_standalone.c ****             if (status != CY_U3P_SUCCESS)
+ 861              		.loc 1 258 0
+ 862 07c0 08301BE5 		ldr	r3, [fp, #-8]
+ 863 07c4 000053E3 		cmp	r3, #0
+ 864 07c8 0000000A 		beq	.L56
+ 259:../standalone_spi/cyfx_gpio_spi_standalone.c ****             {
+ 260:../standalone_spi/cyfx_gpio_spi_standalone.c ****                 break;
+ 865              		.loc 1 260 0
+ 866 07cc 550000EA 		b	.L55
+ 867              	.L56:
+ 261:../standalone_spi/cyfx_gpio_spi_standalone.c ****             }
+ 262:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 263:../standalone_spi/cyfx_gpio_spi_standalone.c ****             CyFxGpioSpiDelayHalfCycle (ctx);
+ 868              		.loc 1 263 0
+ 869 07d0 30001BE5 		ldr	r0, [fp, #-48]
+ 870 07d4 09FEFFEB 		bl	CyFxGpioSpiDelayHalfCycle
+ 264:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 265:../standalone_spi/cyfx_gpio_spi_standalone.c ****             status = CyU3PGpioGetValue (ctx->pinMap.miso, &miso);
+ 871              		.loc 1 265 0
+ 872 07d8 30301BE5 		ldr	r3, [fp, #-48]
+ 873 07dc 0220D3E5 		ldrb	r2, [r3, #2]	@ zero_extendqisi2
+ 874 07e0 28304BE2 		sub	r3, fp, #40
+ 875 07e4 0200A0E1 		mov	r0, r2
+ 876 07e8 0310A0E1 		mov	r1, r3
+ 877 07ec FEFFFFEB 		bl	CyU3PGpioGetValue
+ 878 07f0 08000BE5 		str	r0, [fp, #-8]
+ 266:../standalone_spi/cyfx_gpio_spi_standalone.c ****             if (status != CY_U3P_SUCCESS)
+ 879              		.loc 1 266 0
+ 880 07f4 08301BE5 		ldr	r3, [fp, #-8]
+ 881 07f8 000053E3 		cmp	r3, #0
+ 882 07fc 0000000A 		beq	.L57
+ 267:../standalone_spi/cyfx_gpio_spi_standalone.c ****             {
+ 268:../standalone_spi/cyfx_gpio_spi_standalone.c ****                 break;
+ 883              		.loc 1 268 0
+ 884 0800 480000EA 		b	.L55
+ 885              	.L57:
+ 269:../standalone_spi/cyfx_gpio_spi_standalone.c ****             }
+ 270:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 271:../standalone_spi/cyfx_gpio_spi_standalone.c ****             if (miso == CyTrue)
+ 886              		.loc 1 271 0
+ 887 0804 28301BE5 		ldr	r3, [fp, #-40]
+ 888 0808 010053E3 		cmp	r3, #1
+ 889 080c 0500001A 		bne	.L58
+ 272:../standalone_spi/cyfx_gpio_spi_standalone.c ****             {
+ 273:../standalone_spi/cyfx_gpio_spi_standalone.c ****                 rx |= (1u << bitIndex);
+ 890              		.loc 1 273 0
+ 891 0810 1D305BE5 		ldrb	r3, [fp, #-29]	@ zero_extendqisi2
+ 892 0814 0120A0E3 		mov	r2, #1
+ 893 0818 1233A0E1 		mov	r3, r2, asl r3
+ 894 081c 0C201BE5 		ldr	r2, [fp, #-12]
+ 895 0820 033082E1 		orr	r3, r2, r3
+ 896 0824 0C300BE5 		str	r3, [fp, #-12]
+ 897              	.L58:
+ 274:../standalone_spi/cyfx_gpio_spi_standalone.c ****             }
+ 275:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 276:../standalone_spi/cyfx_gpio_spi_standalone.c ****             status = CyFxGpioSpiSetClock (ctx, idleLevel);
+ 898              		.loc 1 276 0
+ 899 0828 30001BE5 		ldr	r0, [fp, #-48]
+ 900 082c 18101BE5 		ldr	r1, [fp, #-24]
+ 901 0830 0FFEFFEB 		bl	CyFxGpioSpiSetClock
+ 902 0834 08000BE5 		str	r0, [fp, #-8]
+ 277:../standalone_spi/cyfx_gpio_spi_standalone.c ****             if (status != CY_U3P_SUCCESS)
+ 903              		.loc 1 277 0
+ 904 0838 08301BE5 		ldr	r3, [fp, #-8]
+ 905 083c 000053E3 		cmp	r3, #0
+ 906 0840 3000000A 		beq	.L59
+ 278:../standalone_spi/cyfx_gpio_spi_standalone.c ****             {
+ 279:../standalone_spi/cyfx_gpio_spi_standalone.c ****                 break;
+ 907              		.loc 1 279 0
+ 908 0844 370000EA 		b	.L55
+ 909              	.L53:
+ 280:../standalone_spi/cyfx_gpio_spi_standalone.c ****             }
+ 281:../standalone_spi/cyfx_gpio_spi_standalone.c ****         }
+ 282:../standalone_spi/cyfx_gpio_spi_standalone.c ****         else
+ 283:../standalone_spi/cyfx_gpio_spi_standalone.c ****         {
+ 284:../standalone_spi/cyfx_gpio_spi_standalone.c ****             status = CyFxGpioSpiSetClock (ctx, activeLevel);
+ 910              		.loc 1 284 0
+ 911 0848 30001BE5 		ldr	r0, [fp, #-48]
+ 912 084c 1C101BE5 		ldr	r1, [fp, #-28]
+ 913 0850 07FEFFEB 		bl	CyFxGpioSpiSetClock
+ 914 0854 08000BE5 		str	r0, [fp, #-8]
+ 285:../standalone_spi/cyfx_gpio_spi_standalone.c ****             if (status != CY_U3P_SUCCESS)
+ 915              		.loc 1 285 0
+ 916 0858 08301BE5 		ldr	r3, [fp, #-8]
+ 917 085c 000053E3 		cmp	r3, #0
+ 918 0860 0000000A 		beq	.L60
+ 286:../standalone_spi/cyfx_gpio_spi_standalone.c ****             {
+ 287:../standalone_spi/cyfx_gpio_spi_standalone.c ****                 break;
+ 919              		.loc 1 287 0
+ 920 0864 2F0000EA 		b	.L55
+ 921              	.L60:
+ 288:../standalone_spi/cyfx_gpio_spi_standalone.c ****             }
+ 289:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 290:../standalone_spi/cyfx_gpio_spi_standalone.c ****             status = CyFxGpioSpiSetMosi (ctx, mosi);
+ 922              		.loc 1 290 0
+ 923 0868 30001BE5 		ldr	r0, [fp, #-48]
+ 924 086c 24101BE5 		ldr	r1, [fp, #-36]
+ 925 0870 0DFEFFEB 		bl	CyFxGpioSpiSetMosi
+ 926 0874 08000BE5 		str	r0, [fp, #-8]
+ 291:../standalone_spi/cyfx_gpio_spi_standalone.c ****             if (status != CY_U3P_SUCCESS)
+ 927              		.loc 1 291 0
+ 928 0878 08301BE5 		ldr	r3, [fp, #-8]
+ 929 087c 000053E3 		cmp	r3, #0
+ 930 0880 0000000A 		beq	.L61
+ 292:../standalone_spi/cyfx_gpio_spi_standalone.c ****             {
+ 293:../standalone_spi/cyfx_gpio_spi_standalone.c ****                 break;
+ 931              		.loc 1 293 0
+ 932 0884 270000EA 		b	.L55
+ 933              	.L61:
+ 294:../standalone_spi/cyfx_gpio_spi_standalone.c ****             }
+ 295:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 296:../standalone_spi/cyfx_gpio_spi_standalone.c ****             CyFxGpioSpiDelayHalfCycle (ctx);
+ 934              		.loc 1 296 0
+ 935 0888 30001BE5 		ldr	r0, [fp, #-48]
+ 936 088c DBFDFFEB 		bl	CyFxGpioSpiDelayHalfCycle
+ 297:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 298:../standalone_spi/cyfx_gpio_spi_standalone.c ****             status = CyFxGpioSpiSetClock (ctx, idleLevel);
+ 937              		.loc 1 298 0
+ 938 0890 30001BE5 		ldr	r0, [fp, #-48]
+ 939 0894 18101BE5 		ldr	r1, [fp, #-24]
+ 940 0898 F5FDFFEB 		bl	CyFxGpioSpiSetClock
+ 941 089c 08000BE5 		str	r0, [fp, #-8]
+ 299:../standalone_spi/cyfx_gpio_spi_standalone.c ****             if (status != CY_U3P_SUCCESS)
+ 942              		.loc 1 299 0
+ 943 08a0 08301BE5 		ldr	r3, [fp, #-8]
+ 944 08a4 000053E3 		cmp	r3, #0
+ 945 08a8 0000000A 		beq	.L62
+ 300:../standalone_spi/cyfx_gpio_spi_standalone.c ****             {
+ 301:../standalone_spi/cyfx_gpio_spi_standalone.c ****                 break;
+ 946              		.loc 1 301 0
+ 947 08ac 1D0000EA 		b	.L55
+ 948              	.L62:
+ 302:../standalone_spi/cyfx_gpio_spi_standalone.c ****             }
+ 303:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 304:../standalone_spi/cyfx_gpio_spi_standalone.c ****             CyFxGpioSpiDelayHalfCycle (ctx);
+ 949              		.loc 1 304 0
+ 950 08b0 30001BE5 		ldr	r0, [fp, #-48]
+ 951 08b4 D1FDFFEB 		bl	CyFxGpioSpiDelayHalfCycle
+ 305:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 306:../standalone_spi/cyfx_gpio_spi_standalone.c ****             status = CyU3PGpioGetValue (ctx->pinMap.miso, &miso);
+ 952              		.loc 1 306 0
+ 953 08b8 30301BE5 		ldr	r3, [fp, #-48]
+ 954 08bc 0220D3E5 		ldrb	r2, [r3, #2]	@ zero_extendqisi2
+ 955 08c0 28304BE2 		sub	r3, fp, #40
+ 956 08c4 0200A0E1 		mov	r0, r2
+ 957 08c8 0310A0E1 		mov	r1, r3
+ 958 08cc FEFFFFEB 		bl	CyU3PGpioGetValue
+ 959 08d0 08000BE5 		str	r0, [fp, #-8]
+ 307:../standalone_spi/cyfx_gpio_spi_standalone.c ****             if (status != CY_U3P_SUCCESS)
+ 960              		.loc 1 307 0
+ 961 08d4 08301BE5 		ldr	r3, [fp, #-8]
+ 962 08d8 000053E3 		cmp	r3, #0
+ 963 08dc 0000000A 		beq	.L63
+ 308:../standalone_spi/cyfx_gpio_spi_standalone.c ****             {
+ 309:../standalone_spi/cyfx_gpio_spi_standalone.c ****                 break;
+ 964              		.loc 1 309 0
+ 965 08e0 100000EA 		b	.L55
+ 966              	.L63:
+ 310:../standalone_spi/cyfx_gpio_spi_standalone.c ****             }
+ 311:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 312:../standalone_spi/cyfx_gpio_spi_standalone.c ****             if (miso == CyTrue)
+ 967              		.loc 1 312 0
+ 968 08e4 28301BE5 		ldr	r3, [fp, #-40]
+ 969 08e8 010053E3 		cmp	r3, #1
+ 970 08ec 0500001A 		bne	.L59
+ 313:../standalone_spi/cyfx_gpio_spi_standalone.c ****             {
+ 314:../standalone_spi/cyfx_gpio_spi_standalone.c ****                 rx |= (1u << bitIndex);
+ 971              		.loc 1 314 0
+ 972 08f0 1D305BE5 		ldrb	r3, [fp, #-29]	@ zero_extendqisi2
+ 973 08f4 0120A0E3 		mov	r2, #1
+ 974 08f8 1233A0E1 		mov	r3, r2, asl r3
+ 975 08fc 0C201BE5 		ldr	r2, [fp, #-12]
+ 976 0900 033082E1 		orr	r3, r2, r3
+ 977 0904 0C300BE5 		str	r3, [fp, #-12]
+ 978              	.L59:
+ 979              	.LBE4:
+ 242:../standalone_spi/cyfx_gpio_spi_standalone.c ****     {
+ 980              		.loc 1 242 0
+ 981 0908 0D305BE5 		ldrb	r3, [fp, #-13]
+ 982 090c 013083E2 		add	r3, r3, #1
+ 983 0910 0D304BE5 		strb	r3, [fp, #-13]
+ 984              	.L52:
+ 242:../standalone_spi/cyfx_gpio_spi_standalone.c ****     {
+ 985              		.loc 1 242 0 is_stmt 0 discriminator 1
+ 986 0914 34301BE5 		ldr	r3, [fp, #-52]
+ 987 0918 0830D3E5 		ldrb	r3, [r3, #8]	@ zero_extendqisi2
+ 988 091c 0D205BE5 		ldrb	r2, [fp, #-13]	@ zero_extendqisi2
+ 989 0920 030052E1 		cmp	r2, r3
+ 990 0924 7EFFFF3A 		bcc	.L64
+ 991              	.L55:
+ 315:../standalone_spi/cyfx_gpio_spi_standalone.c ****             }
+ 316:../standalone_spi/cyfx_gpio_spi_standalone.c ****         }
+ 317:../standalone_spi/cyfx_gpio_spi_standalone.c ****     }
+ 318:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 319:../standalone_spi/cyfx_gpio_spi_standalone.c ****     if (irqState != 0u)
+ 992              		.loc 1 319 0 is_stmt 1
+ 993 0928 14301BE5 		ldr	r3, [fp, #-20]
+ 994 092c 000053E3 		cmp	r3, #0
+ 995 0930 0100000A 		beq	.L65
+ 996              	.LBB5:
+ 320:../standalone_spi/cyfx_gpio_spi_standalone.c ****     {
+ 321:../standalone_spi/cyfx_gpio_spi_standalone.c ****         CyU3PExitCriticalSection (irqState);
+ 997              		.loc 1 321 0
+ 998 0934 14001BE5 		ldr	r0, [fp, #-20]
+ 999 0938 FEFFFFEB 		bl	CyU3PExitCriticalSection
+ 1000              	.L65:
+ 1001              	.LBE5:
+ 322:../standalone_spi/cyfx_gpio_spi_standalone.c ****     }
+ 323:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 324:../standalone_spi/cyfx_gpio_spi_standalone.c ****     if (frame->keepChipSelect == CyFalse)
+ 1002              		.loc 1 324 0
+ 1003 093c 34301BE5 		ldr	r3, [fp, #-52]
+ 1004 0940 0C3093E5 		ldr	r3, [r3, #12]
+ 1005 0944 000053E3 		cmp	r3, #0
+ 1006 0948 0200001A 		bne	.L66
+ 325:../standalone_spi/cyfx_gpio_spi_standalone.c ****     {
+ 326:../standalone_spi/cyfx_gpio_spi_standalone.c ****         CyFxGpioSpiSetCs (ctx, CyTrue);
+ 1007              		.loc 1 326 0
+ 1008 094c 30001BE5 		ldr	r0, [fp, #-48]
+ 1009 0950 0110A0E3 		mov	r1, #1
+ 1010 0954 E2FDFFEB 		bl	CyFxGpioSpiSetCs
+ 1011              	.L66:
+ 327:../standalone_spi/cyfx_gpio_spi_standalone.c ****     }
+ 328:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 329:../standalone_spi/cyfx_gpio_spi_standalone.c ****     if (frame->rxData != 0)
+ 1012              		.loc 1 329 0
+ 1013 0958 34301BE5 		ldr	r3, [fp, #-52]
+ 1014 095c 043093E5 		ldr	r3, [r3, #4]
+ 1015 0960 000053E3 		cmp	r3, #0
+ 1016 0964 0300000A 		beq	.L67
+ 330:../standalone_spi/cyfx_gpio_spi_standalone.c ****     {
+ 331:../standalone_spi/cyfx_gpio_spi_standalone.c ****         *frame->rxData = rx;
+ 1017              		.loc 1 331 0
+ 1018 0968 34301BE5 		ldr	r3, [fp, #-52]
+ 1019 096c 043093E5 		ldr	r3, [r3, #4]
+ 1020 0970 0C201BE5 		ldr	r2, [fp, #-12]
+ 1021 0974 002083E5 		str	r2, [r3]
+ 1022              	.L67:
+ 332:../standalone_spi/cyfx_gpio_spi_standalone.c ****     }
+ 333:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 334:../standalone_spi/cyfx_gpio_spi_standalone.c ****     CyU3PMutexPut (&ctx->lock);
+ 1023              		.loc 1 334 0
+ 1024 0978 30301BE5 		ldr	r3, [fp, #-48]
+ 1025 097c 1C3083E2 		add	r3, r3, #28
+ 1026 0980 0300A0E1 		mov	r0, r3
+ 1027 0984 FEFFFFEB 		bl	_txe_mutex_put
+ 335:../standalone_spi/cyfx_gpio_spi_standalone.c ****     return status;
+ 1028              		.loc 1 335 0
+ 1029 0988 08301BE5 		ldr	r3, [fp, #-8]
+ 1030              	.L68:
+ 336:../standalone_spi/cyfx_gpio_spi_standalone.c **** }
+ 1031              		.loc 1 336 0
+ 1032 098c 0300A0E1 		mov	r0, r3
+ 1033 0990 04D04BE2 		sub	sp, fp, #4
+ 1034              		@ sp needed
+ 1035 0994 0088BDE8 		ldmfd	sp!, {fp, pc}
+ 1036              		.cfi_endproc
+ 1037              	.LFE9:
+ 1039              		.align	2
+ 1041              	CyFxGpioSpiWorkerEntry:
+ 1042              	.LFB10:
+ 337:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 338:../standalone_spi/cyfx_gpio_spi_standalone.c **** static void
+ 339:../standalone_spi/cyfx_gpio_spi_standalone.c **** CyFxGpioSpiWorkerEntry (uint32_t input)
+ 340:../standalone_spi/cyfx_gpio_spi_standalone.c **** {
+ 1043              		.loc 1 340 0
+ 1044              		.cfi_startproc
+ 1045              		@ args = 0, pretend = 0, frame = 24
+ 1046              		@ frame_needed = 1, uses_anonymous_args = 0
+ 1047 0998 00482DE9 		stmfd	sp!, {fp, lr}
+ 1048              	.LCFI20:
+ 1049              		.cfi_def_cfa_offset 8
+ 1050              		.cfi_offset 11, -8
+ 1051              		.cfi_offset 14, -4
+ 1052 099c 04B08DE2 		add	fp, sp, #4
+ 1053              	.LCFI21:
+ 1054              		.cfi_def_cfa 11, 4
+ 1055 09a0 20D04DE2 		sub	sp, sp, #32
+ 1056 09a4 18000BE5 		str	r0, [fp, #-24]
+ 341:../standalone_spi/cyfx_gpio_spi_standalone.c ****     CyFxGpioSpiWorker_t *worker = (CyFxGpioSpiWorker_t *)input;
+ 1057              		.loc 1 341 0
+ 1058 09a8 18301BE5 		ldr	r3, [fp, #-24]
+ 1059 09ac 08300BE5 		str	r3, [fp, #-8]
+ 342:../standalone_spi/cyfx_gpio_spi_standalone.c ****     uint32_t eventFlags;
+ 343:../standalone_spi/cyfx_gpio_spi_standalone.c ****     CyU3PReturnStatus_t status;
+ 344:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 345:../standalone_spi/cyfx_gpio_spi_standalone.c ****     while (worker->running == CyTrue)
+ 1060              		.loc 1 345 0
+ 1061 09b0 2C0000EA 		b	.L70
+ 1062              	.L74:
+ 346:../standalone_spi/cyfx_gpio_spi_standalone.c ****     {
+ 347:../standalone_spi/cyfx_gpio_spi_standalone.c ****         status = CyU3PEventGet (&worker->requestEvent,
+ 1063              		.loc 1 347 0
+ 1064 09b4 08301BE5 		ldr	r3, [fp, #-8]
+ 1065 09b8 A82083E2 		add	r2, r3, #168
+ 1066 09bc 10304BE2 		sub	r3, fp, #16
+ 1067 09c0 0010E0E3 		mvn	r1, #0
+ 1068 09c4 00108DE5 		str	r1, [sp]
+ 1069 09c8 0200A0E1 		mov	r0, r2
+ 1070 09cc 0110A0E3 		mov	r1, #1
+ 1071 09d0 0120A0E3 		mov	r2, #1
+ 1072 09d4 FEFFFFEB 		bl	_txe_event_flags_get
+ 1073 09d8 0C000BE5 		str	r0, [fp, #-12]
+ 348:../standalone_spi/cyfx_gpio_spi_standalone.c ****                                 CYFX_SPI_WORKER_REQ_EVENT,
+ 349:../standalone_spi/cyfx_gpio_spi_standalone.c ****                                 CYU3P_EVENT_OR_CLEAR,
+ 350:../standalone_spi/cyfx_gpio_spi_standalone.c ****                                 &eventFlags,
+ 351:../standalone_spi/cyfx_gpio_spi_standalone.c ****                                 CYU3P_WAIT_FOREVER);
+ 352:../standalone_spi/cyfx_gpio_spi_standalone.c ****         if (status != CY_U3P_SUCCESS)
+ 1074              		.loc 1 352 0
+ 1075 09dc 0C301BE5 		ldr	r3, [fp, #-12]
+ 1076 09e0 000053E3 		cmp	r3, #0
+ 1077 09e4 0000000A 		beq	.L71
+ 353:../standalone_spi/cyfx_gpio_spi_standalone.c ****         {
+ 354:../standalone_spi/cyfx_gpio_spi_standalone.c ****             continue;
+ 1078              		.loc 1 354 0
+ 1079 09e8 1E0000EA 		b	.L70
+ 1080              	.L71:
+ 355:../standalone_spi/cyfx_gpio_spi_standalone.c ****         }
+ 356:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 357:../standalone_spi/cyfx_gpio_spi_standalone.c ****         if (worker->running == CyFalse)
+ 1081              		.loc 1 357 0
+ 1082 09ec 08301BE5 		ldr	r3, [fp, #-8]
+ 1083 09f0 A03193E5 		ldr	r3, [r3, #416]
+ 1084 09f4 000053E3 		cmp	r3, #0
+ 1085 09f8 0000001A 		bne	.L72
+ 358:../standalone_spi/cyfx_gpio_spi_standalone.c ****         {
+ 359:../standalone_spi/cyfx_gpio_spi_standalone.c ****             break;
+ 1086              		.loc 1 359 0
+ 1087 09fc 1D0000EA 		b	.L69
+ 1088              	.L72:
+ 360:../standalone_spi/cyfx_gpio_spi_standalone.c ****         }
+ 361:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 362:../standalone_spi/cyfx_gpio_spi_standalone.c ****         CyU3PMutexGet (&worker->requestLock, CYU3P_WAIT_FOREVER);
+ 1089              		.loc 1 362 0
+ 1090 0a00 08301BE5 		ldr	r3, [fp, #-8]
+ 1091 0a04 F83083E2 		add	r3, r3, #248
+ 1092 0a08 0300A0E1 		mov	r0, r3
+ 1093 0a0c 0010E0E3 		mvn	r1, #0
+ 1094 0a10 FEFFFFEB 		bl	_txe_mutex_get
+ 363:../standalone_spi/cyfx_gpio_spi_standalone.c ****         worker->requestStatus = CyFxGpioSpiTransferFrame (&worker->spi,
+ 1095              		.loc 1 363 0
+ 1096 0a14 08301BE5 		ldr	r3, [fp, #-8]
+ 1097 0a18 132E83E2 		add	r2, r3, #304
+ 364:../standalone_spi/cyfx_gpio_spi_standalone.c ****                                                           &worker->requestFrame,
+ 1098              		.loc 1 364 0
+ 1099 0a1c 08301BE5 		ldr	r3, [fp, #-8]
+ 1100 0a20 623F83E2 		add	r3, r3, #392
+ 363:../standalone_spi/cyfx_gpio_spi_standalone.c ****         worker->requestStatus = CyFxGpioSpiTransferFrame (&worker->spi,
+ 1101              		.loc 1 363 0
+ 1102 0a24 0200A0E1 		mov	r0, r2
+ 1103 0a28 0310A0E1 		mov	r1, r3
+ 1104 0a2c 0020E0E3 		mvn	r2, #0
+ 1105 0a30 FEFFFFEB 		bl	CyFxGpioSpiTransferFrame
+ 1106 0a34 0020A0E1 		mov	r2, r0
+ 1107 0a38 08301BE5 		ldr	r3, [fp, #-8]
+ 1108 0a3c 9C2183E5 		str	r2, [r3, #412]
+ 365:../standalone_spi/cyfx_gpio_spi_standalone.c ****                                                           CYU3P_WAIT_FOREVER);
+ 366:../standalone_spi/cyfx_gpio_spi_standalone.c ****         CyU3PMutexPut (&worker->requestLock);
+ 1109              		.loc 1 366 0
+ 1110 0a40 08301BE5 		ldr	r3, [fp, #-8]
+ 1111 0a44 F83083E2 		add	r3, r3, #248
+ 1112 0a48 0300A0E1 		mov	r0, r3
+ 1113 0a4c FEFFFFEB 		bl	_txe_mutex_put
+ 367:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 368:../standalone_spi/cyfx_gpio_spi_standalone.c ****         CyU3PEventSet (&worker->doneEvent, CYFX_SPI_WORKER_DONE_EVENT, CYU3P_EVENT_OR);
+ 1114              		.loc 1 368 0
+ 1115 0a50 08301BE5 		ldr	r3, [fp, #-8]
+ 1116 0a54 D03083E2 		add	r3, r3, #208
+ 1117 0a58 0300A0E1 		mov	r0, r3
+ 1118 0a5c 0110A0E3 		mov	r1, #1
+ 1119 0a60 0020A0E3 		mov	r2, #0
+ 1120 0a64 FEFFFFEB 		bl	_txe_event_flags_set
+ 1121              	.L70:
+ 345:../standalone_spi/cyfx_gpio_spi_standalone.c ****     {
+ 1122              		.loc 1 345 0 discriminator 1
+ 1123 0a68 08301BE5 		ldr	r3, [fp, #-8]
+ 1124 0a6c A03193E5 		ldr	r3, [r3, #416]
+ 1125 0a70 010053E3 		cmp	r3, #1
+ 1126 0a74 CEFFFF0A 		beq	.L74
+ 1127              	.L69:
+ 369:../standalone_spi/cyfx_gpio_spi_standalone.c ****     }
+ 370:../standalone_spi/cyfx_gpio_spi_standalone.c **** }
+ 1128              		.loc 1 370 0
+ 1129 0a78 04D04BE2 		sub	sp, fp, #4
+ 1130              		@ sp needed
+ 1131 0a7c 0088BDE8 		ldmfd	sp!, {fp, pc}
+ 1132              		.cfi_endproc
+ 1133              	.LFE10:
+ 1135              		.section	.rodata
+ 1136              		.align	2
+ 1137              	.LC0:
+ 1138 0000 53504920 		.ascii	"SPI Worker\000"
+ 1138      576F726B 
+ 1138      657200
+ 1139 000b 00       		.text
+ 1140              		.align	2
+ 1141              		.global	CyFxGpioSpiWorkerCreate
+ 1143              	CyFxGpioSpiWorkerCreate:
+ 1144              	.LFB11:
+ 371:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 372:../standalone_spi/cyfx_gpio_spi_standalone.c **** CyU3PReturnStatus_t
+ 373:../standalone_spi/cyfx_gpio_spi_standalone.c **** CyFxGpioSpiWorkerCreate (CyFxGpioSpiWorker_t *worker,
+ 374:../standalone_spi/cyfx_gpio_spi_standalone.c ****                          const CyFxGpioSpiPinMap_t *pinMap,
+ 375:../standalone_spi/cyfx_gpio_spi_standalone.c ****                          const CyFxGpioSpiTiming_t *timing,
+ 376:../standalone_spi/cyfx_gpio_spi_standalone.c ****                          void *threadStack,
+ 377:../standalone_spi/cyfx_gpio_spi_standalone.c ****                          uint32_t threadStackSize,
+ 378:../standalone_spi/cyfx_gpio_spi_standalone.c ****                          uint32_t threadPriority,
+ 379:../standalone_spi/cyfx_gpio_spi_standalone.c ****                          uint32_t startImmediately)
+ 380:../standalone_spi/cyfx_gpio_spi_standalone.c **** {
+ 1145              		.loc 1 380 0
+ 1146              		.cfi_startproc
+ 1147              		@ args = 12, pretend = 0, frame = 24
+ 1148              		@ frame_needed = 1, uses_anonymous_args = 0
+ 1149 0a80 00482DE9 		stmfd	sp!, {fp, lr}
+ 1150              	.LCFI22:
+ 1151              		.cfi_def_cfa_offset 8
+ 1152              		.cfi_offset 11, -8
+ 1153              		.cfi_offset 14, -4
+ 1154 0a84 04B08DE2 		add	fp, sp, #4
+ 1155              	.LCFI23:
+ 1156              		.cfi_def_cfa 11, 4
+ 1157 0a88 38D04DE2 		sub	sp, sp, #56
+ 1158 0a8c 10000BE5 		str	r0, [fp, #-16]
+ 1159 0a90 14100BE5 		str	r1, [fp, #-20]
+ 1160 0a94 18200BE5 		str	r2, [fp, #-24]
+ 1161 0a98 1C300BE5 		str	r3, [fp, #-28]
+ 381:../standalone_spi/cyfx_gpio_spi_standalone.c ****     CyU3PReturnStatus_t status;
+ 382:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 383:../standalone_spi/cyfx_gpio_spi_standalone.c ****     if ((worker == 0) || (pinMap == 0) || (timing == 0) || (threadStack == 0))
+ 1162              		.loc 1 383 0
+ 1163 0a9c 10301BE5 		ldr	r3, [fp, #-16]
+ 1164 0aa0 000053E3 		cmp	r3, #0
+ 1165 0aa4 0800000A 		beq	.L76
+ 1166              		.loc 1 383 0 is_stmt 0 discriminator 1
+ 1167 0aa8 14301BE5 		ldr	r3, [fp, #-20]
+ 1168 0aac 000053E3 		cmp	r3, #0
+ 1169 0ab0 0500000A 		beq	.L76
+ 1170 0ab4 18301BE5 		ldr	r3, [fp, #-24]
+ 1171 0ab8 000053E3 		cmp	r3, #0
+ 1172 0abc 0200000A 		beq	.L76
+ 1173 0ac0 1C301BE5 		ldr	r3, [fp, #-28]
+ 1174 0ac4 000053E3 		cmp	r3, #0
+ 1175 0ac8 0100001A 		bne	.L77
+ 1176              	.L76:
+ 384:../standalone_spi/cyfx_gpio_spi_standalone.c ****     {
+ 385:../standalone_spi/cyfx_gpio_spi_standalone.c ****         return CY_U3P_ERROR_BAD_ARGUMENT;
+ 1177              		.loc 1 385 0 is_stmt 1
+ 1178 0acc 4030A0E3 		mov	r3, #64
+ 1179 0ad0 7D0000EA 		b	.L78
+ 1180              	.L77:
+ 386:../standalone_spi/cyfx_gpio_spi_standalone.c ****     }
+ 387:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 388:../standalone_spi/cyfx_gpio_spi_standalone.c ****     CyU3PMemSet ((uint8_t *)worker, 0, sizeof(*worker));
+ 1181              		.loc 1 388 0
+ 1182 0ad4 10001BE5 		ldr	r0, [fp, #-16]
+ 1183 0ad8 0010A0E3 		mov	r1, #0
+ 1184 0adc 692FA0E3 		mov	r2, #420
+ 1185 0ae0 FEFFFFEB 		bl	CyU3PMemSet
+ 389:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 390:../standalone_spi/cyfx_gpio_spi_standalone.c ****     status = CyFxGpioSpiInit (&worker->spi, pinMap, timing);
+ 1186              		.loc 1 390 0
+ 1187 0ae4 10301BE5 		ldr	r3, [fp, #-16]
+ 1188 0ae8 133E83E2 		add	r3, r3, #304
+ 1189 0aec 0300A0E1 		mov	r0, r3
+ 1190 0af0 14101BE5 		ldr	r1, [fp, #-20]
+ 1191 0af4 18201BE5 		ldr	r2, [fp, #-24]
+ 1192 0af8 FEFFFFEB 		bl	CyFxGpioSpiInit
+ 1193 0afc 08000BE5 		str	r0, [fp, #-8]
+ 391:../standalone_spi/cyfx_gpio_spi_standalone.c ****     if (status != CY_U3P_SUCCESS)
+ 1194              		.loc 1 391 0
+ 1195 0b00 08301BE5 		ldr	r3, [fp, #-8]
+ 1196 0b04 000053E3 		cmp	r3, #0
+ 1197 0b08 0100000A 		beq	.L79
+ 392:../standalone_spi/cyfx_gpio_spi_standalone.c ****     {
+ 393:../standalone_spi/cyfx_gpio_spi_standalone.c ****         return status;
+ 1198              		.loc 1 393 0
+ 1199 0b0c 08301BE5 		ldr	r3, [fp, #-8]
+ 1200 0b10 6D0000EA 		b	.L78
+ 1201              	.L79:
+ 394:../standalone_spi/cyfx_gpio_spi_standalone.c ****     }
+ 395:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 396:../standalone_spi/cyfx_gpio_spi_standalone.c ****     status = CyU3PEventCreate (&worker->requestEvent);
+ 1202              		.loc 1 396 0
+ 1203 0b14 10301BE5 		ldr	r3, [fp, #-16]
+ 1204 0b18 A83083E2 		add	r3, r3, #168
+ 1205 0b1c 0300A0E1 		mov	r0, r3
+ 1206 0b20 0010A0E3 		mov	r1, #0
+ 1207 0b24 2820A0E3 		mov	r2, #40
+ 1208 0b28 FEFFFFEB 		bl	_txe_event_flags_create
+ 1209 0b2c 08000BE5 		str	r0, [fp, #-8]
+ 397:../standalone_spi/cyfx_gpio_spi_standalone.c ****     if (status != CY_U3P_SUCCESS)
+ 1210              		.loc 1 397 0
+ 1211 0b30 08301BE5 		ldr	r3, [fp, #-8]
+ 1212 0b34 000053E3 		cmp	r3, #0
+ 1213 0b38 0500000A 		beq	.L80
+ 398:../standalone_spi/cyfx_gpio_spi_standalone.c ****     {
+ 399:../standalone_spi/cyfx_gpio_spi_standalone.c ****         CyFxGpioSpiDeInit (&worker->spi);
+ 1214              		.loc 1 399 0
+ 1215 0b3c 10301BE5 		ldr	r3, [fp, #-16]
+ 1216 0b40 133E83E2 		add	r3, r3, #304
+ 1217 0b44 0300A0E1 		mov	r0, r3
+ 1218 0b48 FEFFFFEB 		bl	CyFxGpioSpiDeInit
+ 400:../standalone_spi/cyfx_gpio_spi_standalone.c ****         return status;
+ 1219              		.loc 1 400 0
+ 1220 0b4c 08301BE5 		ldr	r3, [fp, #-8]
+ 1221 0b50 5D0000EA 		b	.L78
+ 1222              	.L80:
+ 401:../standalone_spi/cyfx_gpio_spi_standalone.c ****     }
+ 402:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 403:../standalone_spi/cyfx_gpio_spi_standalone.c ****     status = CyU3PEventCreate (&worker->doneEvent);
+ 1223              		.loc 1 403 0
+ 1224 0b54 10301BE5 		ldr	r3, [fp, #-16]
+ 1225 0b58 D03083E2 		add	r3, r3, #208
+ 1226 0b5c 0300A0E1 		mov	r0, r3
+ 1227 0b60 0010A0E3 		mov	r1, #0
+ 1228 0b64 2820A0E3 		mov	r2, #40
+ 1229 0b68 FEFFFFEB 		bl	_txe_event_flags_create
+ 1230 0b6c 08000BE5 		str	r0, [fp, #-8]
+ 404:../standalone_spi/cyfx_gpio_spi_standalone.c ****     if (status != CY_U3P_SUCCESS)
+ 1231              		.loc 1 404 0
+ 1232 0b70 08301BE5 		ldr	r3, [fp, #-8]
+ 1233 0b74 000053E3 		cmp	r3, #0
+ 1234 0b78 0900000A 		beq	.L81
+ 405:../standalone_spi/cyfx_gpio_spi_standalone.c ****     {
+ 406:../standalone_spi/cyfx_gpio_spi_standalone.c ****         CyU3PEventDestroy (&worker->requestEvent);
+ 1235              		.loc 1 406 0
+ 1236 0b7c 10301BE5 		ldr	r3, [fp, #-16]
+ 1237 0b80 A83083E2 		add	r3, r3, #168
+ 1238 0b84 0300A0E1 		mov	r0, r3
+ 1239 0b88 FEFFFFEB 		bl	_txe_event_flags_delete
+ 407:../standalone_spi/cyfx_gpio_spi_standalone.c ****         CyFxGpioSpiDeInit (&worker->spi);
+ 1240              		.loc 1 407 0
+ 1241 0b8c 10301BE5 		ldr	r3, [fp, #-16]
+ 1242 0b90 133E83E2 		add	r3, r3, #304
+ 1243 0b94 0300A0E1 		mov	r0, r3
+ 1244 0b98 FEFFFFEB 		bl	CyFxGpioSpiDeInit
+ 408:../standalone_spi/cyfx_gpio_spi_standalone.c ****         return status;
+ 1245              		.loc 1 408 0
+ 1246 0b9c 08301BE5 		ldr	r3, [fp, #-8]
+ 1247 0ba0 490000EA 		b	.L78
+ 1248              	.L81:
+ 409:../standalone_spi/cyfx_gpio_spi_standalone.c ****     }
+ 410:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 411:../standalone_spi/cyfx_gpio_spi_standalone.c ****     status = CyU3PMutexCreate (&worker->requestLock, CyFalse);
+ 1249              		.loc 1 411 0
+ 1250 0ba4 10301BE5 		ldr	r3, [fp, #-16]
+ 1251 0ba8 F83083E2 		add	r3, r3, #248
+ 1252 0bac 0300A0E1 		mov	r0, r3
+ 1253 0bb0 0010A0E3 		mov	r1, #0
+ 1254 0bb4 0020A0E3 		mov	r2, #0
+ 1255 0bb8 3830A0E3 		mov	r3, #56
+ 1256 0bbc FEFFFFEB 		bl	_txe_mutex_create
+ 1257 0bc0 08000BE5 		str	r0, [fp, #-8]
+ 412:../standalone_spi/cyfx_gpio_spi_standalone.c ****     if (status != CY_U3P_SUCCESS)
+ 1258              		.loc 1 412 0
+ 1259 0bc4 08301BE5 		ldr	r3, [fp, #-8]
+ 1260 0bc8 000053E3 		cmp	r3, #0
+ 1261 0bcc 0D00000A 		beq	.L82
+ 413:../standalone_spi/cyfx_gpio_spi_standalone.c ****     {
+ 414:../standalone_spi/cyfx_gpio_spi_standalone.c ****         CyU3PEventDestroy (&worker->requestEvent);
+ 1262              		.loc 1 414 0
+ 1263 0bd0 10301BE5 		ldr	r3, [fp, #-16]
+ 1264 0bd4 A83083E2 		add	r3, r3, #168
+ 1265 0bd8 0300A0E1 		mov	r0, r3
+ 1266 0bdc FEFFFFEB 		bl	_txe_event_flags_delete
+ 415:../standalone_spi/cyfx_gpio_spi_standalone.c ****         CyU3PEventDestroy (&worker->doneEvent);
+ 1267              		.loc 1 415 0
+ 1268 0be0 10301BE5 		ldr	r3, [fp, #-16]
+ 1269 0be4 D03083E2 		add	r3, r3, #208
+ 1270 0be8 0300A0E1 		mov	r0, r3
+ 1271 0bec FEFFFFEB 		bl	_txe_event_flags_delete
+ 416:../standalone_spi/cyfx_gpio_spi_standalone.c ****         CyFxGpioSpiDeInit (&worker->spi);
+ 1272              		.loc 1 416 0
+ 1273 0bf0 10301BE5 		ldr	r3, [fp, #-16]
+ 1274 0bf4 133E83E2 		add	r3, r3, #304
+ 1275 0bf8 0300A0E1 		mov	r0, r3
+ 1276 0bfc FEFFFFEB 		bl	CyFxGpioSpiDeInit
+ 417:../standalone_spi/cyfx_gpio_spi_standalone.c ****         return status;
+ 1277              		.loc 1 417 0
+ 1278 0c00 08301BE5 		ldr	r3, [fp, #-8]
+ 1279 0c04 300000EA 		b	.L78
+ 1280              	.L82:
+ 418:../standalone_spi/cyfx_gpio_spi_standalone.c ****     }
+ 419:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 420:../standalone_spi/cyfx_gpio_spi_standalone.c ****     worker->running = CyTrue;
+ 1281              		.loc 1 420 0
+ 1282 0c08 10301BE5 		ldr	r3, [fp, #-16]
+ 1283 0c0c 0120A0E3 		mov	r2, #1
+ 1284 0c10 A02183E5 		str	r2, [r3, #416]
+ 421:../standalone_spi/cyfx_gpio_spi_standalone.c ****     status = CyU3PThreadCreate (&worker->thread,
+ 1285              		.loc 1 421 0
+ 1286 0c14 10201BE5 		ldr	r2, [fp, #-16]
+ 1287 0c18 10301BE5 		ldr	r3, [fp, #-16]
+ 1288 0c1c 1C101BE5 		ldr	r1, [fp, #-28]
+ 1289 0c20 00108DE5 		str	r1, [sp]
+ 1290 0c24 04109BE5 		ldr	r1, [fp, #4]
+ 1291 0c28 04108DE5 		str	r1, [sp, #4]
+ 1292 0c2c 08109BE5 		ldr	r1, [fp, #8]
+ 1293 0c30 08108DE5 		str	r1, [sp, #8]
+ 1294 0c34 08109BE5 		ldr	r1, [fp, #8]
+ 1295 0c38 0C108DE5 		str	r1, [sp, #12]
+ 1296 0c3c 0010A0E3 		mov	r1, #0
+ 1297 0c40 10108DE5 		str	r1, [sp, #16]
+ 1298 0c44 0C109BE5 		ldr	r1, [fp, #12]
+ 1299 0c48 14108DE5 		str	r1, [sp, #20]
+ 1300 0c4c A810A0E3 		mov	r1, #168
+ 1301 0c50 18108DE5 		str	r1, [sp, #24]
+ 1302 0c54 0200A0E1 		mov	r0, r2
+ 1303 0c58 78109FE5 		ldr	r1, .L84
+ 1304 0c5c 78209FE5 		ldr	r2, .L84+4
+ 1305 0c60 FEFFFFEB 		bl	_txe_thread_create
+ 1306 0c64 08000BE5 		str	r0, [fp, #-8]
+ 422:../standalone_spi/cyfx_gpio_spi_standalone.c ****                                 "SPI Worker",
+ 423:../standalone_spi/cyfx_gpio_spi_standalone.c ****                                 CyFxGpioSpiWorkerEntry,
+ 424:../standalone_spi/cyfx_gpio_spi_standalone.c ****                                 (uint32_t)worker,
+ 425:../standalone_spi/cyfx_gpio_spi_standalone.c ****                                 threadStack,
+ 426:../standalone_spi/cyfx_gpio_spi_standalone.c ****                                 threadStackSize,
+ 427:../standalone_spi/cyfx_gpio_spi_standalone.c ****                                 threadPriority,
+ 428:../standalone_spi/cyfx_gpio_spi_standalone.c ****                                 threadPriority,
+ 429:../standalone_spi/cyfx_gpio_spi_standalone.c ****                                 CYU3P_NO_TIME_SLICE,
+ 430:../standalone_spi/cyfx_gpio_spi_standalone.c ****                                 startImmediately);
+ 431:../standalone_spi/cyfx_gpio_spi_standalone.c ****     if (status != CY_U3P_SUCCESS)
+ 1307              		.loc 1 431 0
+ 1308 0c68 08301BE5 		ldr	r3, [fp, #-8]
+ 1309 0c6c 000053E3 		cmp	r3, #0
+ 1310 0c70 1400000A 		beq	.L83
+ 432:../standalone_spi/cyfx_gpio_spi_standalone.c ****     {
+ 433:../standalone_spi/cyfx_gpio_spi_standalone.c ****         worker->running = CyFalse;
+ 1311              		.loc 1 433 0
+ 1312 0c74 10301BE5 		ldr	r3, [fp, #-16]
+ 1313 0c78 0020A0E3 		mov	r2, #0
+ 1314 0c7c A02183E5 		str	r2, [r3, #416]
+ 434:../standalone_spi/cyfx_gpio_spi_standalone.c ****         CyU3PMutexDestroy (&worker->requestLock);
+ 1315              		.loc 1 434 0
+ 1316 0c80 10301BE5 		ldr	r3, [fp, #-16]
+ 1317 0c84 F83083E2 		add	r3, r3, #248
+ 1318 0c88 0300A0E1 		mov	r0, r3
+ 1319 0c8c FEFFFFEB 		bl	_txe_mutex_delete
+ 435:../standalone_spi/cyfx_gpio_spi_standalone.c ****         CyU3PEventDestroy (&worker->requestEvent);
+ 1320              		.loc 1 435 0
+ 1321 0c90 10301BE5 		ldr	r3, [fp, #-16]
+ 1322 0c94 A83083E2 		add	r3, r3, #168
+ 1323 0c98 0300A0E1 		mov	r0, r3
+ 1324 0c9c FEFFFFEB 		bl	_txe_event_flags_delete
+ 436:../standalone_spi/cyfx_gpio_spi_standalone.c ****         CyU3PEventDestroy (&worker->doneEvent);
+ 1325              		.loc 1 436 0
+ 1326 0ca0 10301BE5 		ldr	r3, [fp, #-16]
+ 1327 0ca4 D03083E2 		add	r3, r3, #208
+ 1328 0ca8 0300A0E1 		mov	r0, r3
+ 1329 0cac FEFFFFEB 		bl	_txe_event_flags_delete
+ 437:../standalone_spi/cyfx_gpio_spi_standalone.c ****         CyFxGpioSpiDeInit (&worker->spi);
+ 1330              		.loc 1 437 0
+ 1331 0cb0 10301BE5 		ldr	r3, [fp, #-16]
+ 1332 0cb4 133E83E2 		add	r3, r3, #304
+ 1333 0cb8 0300A0E1 		mov	r0, r3
+ 1334 0cbc FEFFFFEB 		bl	CyFxGpioSpiDeInit
+ 438:../standalone_spi/cyfx_gpio_spi_standalone.c ****         return status;
+ 1335              		.loc 1 438 0
+ 1336 0cc0 08301BE5 		ldr	r3, [fp, #-8]
+ 1337 0cc4 000000EA 		b	.L78
+ 1338              	.L83:
+ 439:../standalone_spi/cyfx_gpio_spi_standalone.c ****     }
+ 440:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 441:../standalone_spi/cyfx_gpio_spi_standalone.c ****     return CY_U3P_SUCCESS;
+ 1339              		.loc 1 441 0
+ 1340 0cc8 0030A0E3 		mov	r3, #0
+ 1341              	.L78:
+ 442:../standalone_spi/cyfx_gpio_spi_standalone.c **** }
+ 1342              		.loc 1 442 0
+ 1343 0ccc 0300A0E1 		mov	r0, r3
+ 1344 0cd0 04D04BE2 		sub	sp, fp, #4
+ 1345              		@ sp needed
+ 1346 0cd4 0088BDE8 		ldmfd	sp!, {fp, pc}
+ 1347              	.L85:
+ 1348              		.align	2
+ 1349              	.L84:
+ 1350 0cd8 00000000 		.word	.LC0
+ 1351 0cdc 00000000 		.word	CyFxGpioSpiWorkerEntry
+ 1352              		.cfi_endproc
+ 1353              	.LFE11:
+ 1355              		.align	2
+ 1356              		.global	CyFxGpioSpiWorkerDestroy
+ 1358              	CyFxGpioSpiWorkerDestroy:
+ 1359              	.LFB12:
+ 443:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 444:../standalone_spi/cyfx_gpio_spi_standalone.c **** void
+ 445:../standalone_spi/cyfx_gpio_spi_standalone.c **** CyFxGpioSpiWorkerDestroy (CyFxGpioSpiWorker_t *worker)
+ 446:../standalone_spi/cyfx_gpio_spi_standalone.c **** {
+ 1360              		.loc 1 446 0
+ 1361              		.cfi_startproc
+ 1362              		@ args = 0, pretend = 0, frame = 8
+ 1363              		@ frame_needed = 1, uses_anonymous_args = 0
+ 1364 0ce0 00482DE9 		stmfd	sp!, {fp, lr}
+ 1365              	.LCFI24:
+ 1366              		.cfi_def_cfa_offset 8
+ 1367              		.cfi_offset 11, -8
+ 1368              		.cfi_offset 14, -4
+ 1369 0ce4 04B08DE2 		add	fp, sp, #4
+ 1370              	.LCFI25:
+ 1371              		.cfi_def_cfa 11, 4
+ 1372 0ce8 08D04DE2 		sub	sp, sp, #8
+ 1373 0cec 08000BE5 		str	r0, [fp, #-8]
+ 447:../standalone_spi/cyfx_gpio_spi_standalone.c ****     if (worker == 0)
+ 1374              		.loc 1 447 0
+ 1375 0cf0 08301BE5 		ldr	r3, [fp, #-8]
+ 1376 0cf4 000053E3 		cmp	r3, #0
+ 1377 0cf8 0000001A 		bne	.L87
+ 448:../standalone_spi/cyfx_gpio_spi_standalone.c ****     {
+ 449:../standalone_spi/cyfx_gpio_spi_standalone.c ****         return;
+ 1378              		.loc 1 449 0
+ 1379 0cfc 200000EA 		b	.L86
+ 1380              	.L87:
+ 450:../standalone_spi/cyfx_gpio_spi_standalone.c ****     }
+ 451:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 452:../standalone_spi/cyfx_gpio_spi_standalone.c ****     worker->running = CyFalse;
+ 1381              		.loc 1 452 0
+ 1382 0d00 08301BE5 		ldr	r3, [fp, #-8]
+ 1383 0d04 0020A0E3 		mov	r2, #0
+ 1384 0d08 A02183E5 		str	r2, [r3, #416]
+ 453:../standalone_spi/cyfx_gpio_spi_standalone.c ****     CyU3PEventSet (&worker->requestEvent, CYFX_SPI_WORKER_REQ_EVENT, CYU3P_EVENT_OR);
+ 1385              		.loc 1 453 0
+ 1386 0d0c 08301BE5 		ldr	r3, [fp, #-8]
+ 1387 0d10 A83083E2 		add	r3, r3, #168
+ 1388 0d14 0300A0E1 		mov	r0, r3
+ 1389 0d18 0110A0E3 		mov	r1, #1
+ 1390 0d1c 0020A0E3 		mov	r2, #0
+ 1391 0d20 FEFFFFEB 		bl	_txe_event_flags_set
+ 454:../standalone_spi/cyfx_gpio_spi_standalone.c ****     CyU3PThreadSleep (1);
+ 1392              		.loc 1 454 0
+ 1393 0d24 0100A0E3 		mov	r0, #1
+ 1394 0d28 FEFFFFEB 		bl	_tx_thread_sleep
+ 455:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 456:../standalone_spi/cyfx_gpio_spi_standalone.c ****     CyU3PThreadTerminate (&worker->thread);
+ 1395              		.loc 1 456 0
+ 1396 0d2c 08301BE5 		ldr	r3, [fp, #-8]
+ 1397 0d30 0300A0E1 		mov	r0, r3
+ 1398 0d34 FEFFFFEB 		bl	CyU3PThreadTerminate
+ 457:../standalone_spi/cyfx_gpio_spi_standalone.c ****     CyU3PThreadDelete (&worker->thread);
+ 1399              		.loc 1 457 0
+ 1400 0d38 08301BE5 		ldr	r3, [fp, #-8]
+ 1401 0d3c 0300A0E1 		mov	r0, r3
+ 1402 0d40 FEFFFFEB 		bl	CyU3PThreadDelete
+ 458:../standalone_spi/cyfx_gpio_spi_standalone.c ****     CyU3PMutexDestroy (&worker->requestLock);
+ 1403              		.loc 1 458 0
+ 1404 0d44 08301BE5 		ldr	r3, [fp, #-8]
+ 1405 0d48 F83083E2 		add	r3, r3, #248
+ 1406 0d4c 0300A0E1 		mov	r0, r3
+ 1407 0d50 FEFFFFEB 		bl	_txe_mutex_delete
+ 459:../standalone_spi/cyfx_gpio_spi_standalone.c ****     CyU3PEventDestroy (&worker->requestEvent);
+ 1408              		.loc 1 459 0
+ 1409 0d54 08301BE5 		ldr	r3, [fp, #-8]
+ 1410 0d58 A83083E2 		add	r3, r3, #168
+ 1411 0d5c 0300A0E1 		mov	r0, r3
+ 1412 0d60 FEFFFFEB 		bl	_txe_event_flags_delete
+ 460:../standalone_spi/cyfx_gpio_spi_standalone.c ****     CyU3PEventDestroy (&worker->doneEvent);
+ 1413              		.loc 1 460 0
+ 1414 0d64 08301BE5 		ldr	r3, [fp, #-8]
+ 1415 0d68 D03083E2 		add	r3, r3, #208
+ 1416 0d6c 0300A0E1 		mov	r0, r3
+ 1417 0d70 FEFFFFEB 		bl	_txe_event_flags_delete
+ 461:../standalone_spi/cyfx_gpio_spi_standalone.c ****     CyFxGpioSpiDeInit (&worker->spi);
+ 1418              		.loc 1 461 0
+ 1419 0d74 08301BE5 		ldr	r3, [fp, #-8]
+ 1420 0d78 133E83E2 		add	r3, r3, #304
+ 1421 0d7c 0300A0E1 		mov	r0, r3
+ 1422 0d80 FEFFFFEB 		bl	CyFxGpioSpiDeInit
+ 1423              	.L86:
+ 462:../standalone_spi/cyfx_gpio_spi_standalone.c **** }
+ 1424              		.loc 1 462 0
+ 1425 0d84 04D04BE2 		sub	sp, fp, #4
+ 1426              		@ sp needed
+ 1427 0d88 0088BDE8 		ldmfd	sp!, {fp, pc}
+ 1428              		.cfi_endproc
+ 1429              	.LFE12:
+ 1431              		.align	2
+ 1432              		.global	CyFxGpioSpiWorkerTransferFrame
+ 1434              	CyFxGpioSpiWorkerTransferFrame:
+ 1435              	.LFB13:
+ 463:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 464:../standalone_spi/cyfx_gpio_spi_standalone.c **** CyU3PReturnStatus_t
+ 465:../standalone_spi/cyfx_gpio_spi_standalone.c **** CyFxGpioSpiWorkerTransferFrame (CyFxGpioSpiWorker_t *worker,
+ 466:../standalone_spi/cyfx_gpio_spi_standalone.c ****                                 const CyFxGpioSpiFrame_t *frame,
+ 467:../standalone_spi/cyfx_gpio_spi_standalone.c ****                                 uint32_t waitOption)
+ 468:../standalone_spi/cyfx_gpio_spi_standalone.c **** {
+ 1436              		.loc 1 468 0
+ 1437              		.cfi_startproc
+ 1438              		@ args = 0, pretend = 0, frame = 24
+ 1439              		@ frame_needed = 1, uses_anonymous_args = 0
+ 1440 0d8c 00482DE9 		stmfd	sp!, {fp, lr}
+ 1441              	.LCFI26:
+ 1442              		.cfi_def_cfa_offset 8
+ 1443              		.cfi_offset 11, -8
+ 1444              		.cfi_offset 14, -4
+ 1445 0d90 04B08DE2 		add	fp, sp, #4
+ 1446              	.LCFI27:
+ 1447              		.cfi_def_cfa 11, 4
+ 1448 0d94 20D04DE2 		sub	sp, sp, #32
+ 1449 0d98 10000BE5 		str	r0, [fp, #-16]
+ 1450 0d9c 14100BE5 		str	r1, [fp, #-20]
+ 1451 0da0 18200BE5 		str	r2, [fp, #-24]
+ 469:../standalone_spi/cyfx_gpio_spi_standalone.c ****     CyU3PReturnStatus_t status;
+ 470:../standalone_spi/cyfx_gpio_spi_standalone.c ****     uint32_t eventFlags;
+ 471:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 472:../standalone_spi/cyfx_gpio_spi_standalone.c ****     if ((worker == 0) || (frame == 0) || (worker->running == CyFalse))
+ 1452              		.loc 1 472 0
+ 1453 0da4 10301BE5 		ldr	r3, [fp, #-16]
+ 1454 0da8 000053E3 		cmp	r3, #0
+ 1455 0dac 0600000A 		beq	.L90
+ 1456              		.loc 1 472 0 is_stmt 0 discriminator 1
+ 1457 0db0 14301BE5 		ldr	r3, [fp, #-20]
+ 1458 0db4 000053E3 		cmp	r3, #0
+ 1459 0db8 0300000A 		beq	.L90
+ 1460 0dbc 10301BE5 		ldr	r3, [fp, #-16]
+ 1461 0dc0 A03193E5 		ldr	r3, [r3, #416]
+ 1462 0dc4 000053E3 		cmp	r3, #0
+ 1463 0dc8 0100001A 		bne	.L91
+ 1464              	.L90:
+ 473:../standalone_spi/cyfx_gpio_spi_standalone.c ****     {
+ 474:../standalone_spi/cyfx_gpio_spi_standalone.c ****         return CY_U3P_ERROR_BAD_ARGUMENT;
+ 1465              		.loc 1 474 0 is_stmt 1
+ 1466 0dcc 4030A0E3 		mov	r3, #64
+ 1467 0dd0 300000EA 		b	.L95
+ 1468              	.L91:
+ 475:../standalone_spi/cyfx_gpio_spi_standalone.c ****     }
+ 476:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 477:../standalone_spi/cyfx_gpio_spi_standalone.c ****     status = CyU3PMutexGet (&worker->requestLock, waitOption);
+ 1469              		.loc 1 477 0
+ 1470 0dd4 10301BE5 		ldr	r3, [fp, #-16]
+ 1471 0dd8 F83083E2 		add	r3, r3, #248
+ 1472 0ddc 0300A0E1 		mov	r0, r3
+ 1473 0de0 18101BE5 		ldr	r1, [fp, #-24]
+ 1474 0de4 FEFFFFEB 		bl	_txe_mutex_get
+ 1475 0de8 08000BE5 		str	r0, [fp, #-8]
+ 478:../standalone_spi/cyfx_gpio_spi_standalone.c ****     if (status != CY_U3P_SUCCESS)
+ 1476              		.loc 1 478 0
+ 1477 0dec 08301BE5 		ldr	r3, [fp, #-8]
+ 1478 0df0 000053E3 		cmp	r3, #0
+ 1479 0df4 0100000A 		beq	.L93
+ 479:../standalone_spi/cyfx_gpio_spi_standalone.c ****     {
+ 480:../standalone_spi/cyfx_gpio_spi_standalone.c ****         return status;
+ 1480              		.loc 1 480 0
+ 1481 0df8 08301BE5 		ldr	r3, [fp, #-8]
+ 1482 0dfc 250000EA 		b	.L95
+ 1483              	.L93:
+ 481:../standalone_spi/cyfx_gpio_spi_standalone.c ****     }
+ 482:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 483:../standalone_spi/cyfx_gpio_spi_standalone.c ****     worker->requestFrame = *frame;
+ 1484              		.loc 1 483 0
+ 1485 0e00 10201BE5 		ldr	r2, [fp, #-16]
+ 1486 0e04 14301BE5 		ldr	r3, [fp, #-20]
+ 1487 0e08 62CF82E2 		add	ip, r2, #392
+ 1488 0e0c 03E0A0E1 		mov	lr, r3
+ 1489 0e10 0F00BEE8 		ldmia	lr!, {r0, r1, r2, r3}
+ 1490 0e14 0F00ACE8 		stmia	ip!, {r0, r1, r2, r3}
+ 1491 0e18 00309EE5 		ldr	r3, [lr]
+ 1492 0e1c 00308CE5 		str	r3, [ip]
+ 484:../standalone_spi/cyfx_gpio_spi_standalone.c ****     worker->requestStatus = CY_U3P_ERROR_TIMEOUT;
+ 1493              		.loc 1 484 0
+ 1494 0e20 10301BE5 		ldr	r3, [fp, #-16]
+ 1495 0e24 4520A0E3 		mov	r2, #69
+ 1496 0e28 9C2183E5 		str	r2, [r3, #412]
+ 485:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 486:../standalone_spi/cyfx_gpio_spi_standalone.c ****     CyU3PEventSet (&worker->requestEvent, CYFX_SPI_WORKER_REQ_EVENT, CYU3P_EVENT_OR);
+ 1497              		.loc 1 486 0
+ 1498 0e2c 10301BE5 		ldr	r3, [fp, #-16]
+ 1499 0e30 A83083E2 		add	r3, r3, #168
+ 1500 0e34 0300A0E1 		mov	r0, r3
+ 1501 0e38 0110A0E3 		mov	r1, #1
+ 1502 0e3c 0020A0E3 		mov	r2, #0
+ 1503 0e40 FEFFFFEB 		bl	_txe_event_flags_set
+ 487:../standalone_spi/cyfx_gpio_spi_standalone.c ****     CyU3PMutexPut (&worker->requestLock);
+ 1504              		.loc 1 487 0
+ 1505 0e44 10301BE5 		ldr	r3, [fp, #-16]
+ 1506 0e48 F83083E2 		add	r3, r3, #248
+ 1507 0e4c 0300A0E1 		mov	r0, r3
+ 1508 0e50 FEFFFFEB 		bl	_txe_mutex_put
+ 488:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 489:../standalone_spi/cyfx_gpio_spi_standalone.c ****     status = CyU3PEventGet (&worker->doneEvent,
+ 1509              		.loc 1 489 0
+ 1510 0e54 10301BE5 		ldr	r3, [fp, #-16]
+ 1511 0e58 D02083E2 		add	r2, r3, #208
+ 1512 0e5c 0C304BE2 		sub	r3, fp, #12
+ 1513 0e60 18101BE5 		ldr	r1, [fp, #-24]
+ 1514 0e64 00108DE5 		str	r1, [sp]
+ 1515 0e68 0200A0E1 		mov	r0, r2
+ 1516 0e6c 0110A0E3 		mov	r1, #1
+ 1517 0e70 0120A0E3 		mov	r2, #1
+ 1518 0e74 FEFFFFEB 		bl	_txe_event_flags_get
+ 1519 0e78 08000BE5 		str	r0, [fp, #-8]
+ 490:../standalone_spi/cyfx_gpio_spi_standalone.c ****                             CYFX_SPI_WORKER_DONE_EVENT,
+ 491:../standalone_spi/cyfx_gpio_spi_standalone.c ****                             CYU3P_EVENT_OR_CLEAR,
+ 492:../standalone_spi/cyfx_gpio_spi_standalone.c ****                             &eventFlags,
+ 493:../standalone_spi/cyfx_gpio_spi_standalone.c ****                             waitOption);
+ 494:../standalone_spi/cyfx_gpio_spi_standalone.c ****     if (status != CY_U3P_SUCCESS)
+ 1520              		.loc 1 494 0
+ 1521 0e7c 08301BE5 		ldr	r3, [fp, #-8]
+ 1522 0e80 000053E3 		cmp	r3, #0
+ 1523 0e84 0100000A 		beq	.L94
+ 495:../standalone_spi/cyfx_gpio_spi_standalone.c ****     {
+ 496:../standalone_spi/cyfx_gpio_spi_standalone.c ****         return status;
+ 1524              		.loc 1 496 0
+ 1525 0e88 08301BE5 		ldr	r3, [fp, #-8]
+ 1526 0e8c 010000EA 		b	.L95
+ 1527              	.L94:
+ 497:../standalone_spi/cyfx_gpio_spi_standalone.c ****     }
+ 498:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 499:../standalone_spi/cyfx_gpio_spi_standalone.c ****     return worker->requestStatus;
+ 1528              		.loc 1 499 0
+ 1529 0e90 10301BE5 		ldr	r3, [fp, #-16]
+ 1530 0e94 9C3193E5 		ldr	r3, [r3, #412]
+ 1531              	.L95:
+ 500:../standalone_spi/cyfx_gpio_spi_standalone.c **** }
+ 1532              		.loc 1 500 0
+ 1533 0e98 0300A0E1 		mov	r0, r3
+ 1534 0e9c 04D04BE2 		sub	sp, fp, #4
+ 1535              		@ sp needed
+ 1536 0ea0 0088BDE8 		ldmfd	sp!, {fp, pc}
+ 1537              		.cfi_endproc
+ 1538              	.LFE13:
+ 1540              		.align	2
+ 1541              		.global	CyFxGpioSpiWorkerTransfer24
+ 1543              	CyFxGpioSpiWorkerTransfer24:
+ 1544              	.LFB14:
+ 501:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 502:../standalone_spi/cyfx_gpio_spi_standalone.c **** CyU3PReturnStatus_t
+ 503:../standalone_spi/cyfx_gpio_spi_standalone.c **** CyFxGpioSpiWorkerTransfer24 (CyFxGpioSpiWorker_t *worker,
+ 504:../standalone_spi/cyfx_gpio_spi_standalone.c ****                              uint32_t tx24,
+ 505:../standalone_spi/cyfx_gpio_spi_standalone.c ****                              uint32_t *rx24,
+ 506:../standalone_spi/cyfx_gpio_spi_standalone.c ****                              CyBool_t irqGuard,
+ 507:../standalone_spi/cyfx_gpio_spi_standalone.c ****                              uint32_t waitOption)
+ 508:../standalone_spi/cyfx_gpio_spi_standalone.c **** {
+ 1545              		.loc 1 508 0
+ 1546              		.cfi_startproc
+ 1547              		@ args = 4, pretend = 0, frame = 40
+ 1548              		@ frame_needed = 1, uses_anonymous_args = 0
+ 1549 0ea4 00482DE9 		stmfd	sp!, {fp, lr}
+ 1550              	.LCFI28:
+ 1551              		.cfi_def_cfa_offset 8
+ 1552              		.cfi_offset 11, -8
+ 1553              		.cfi_offset 14, -4
+ 1554 0ea8 04B08DE2 		add	fp, sp, #4
+ 1555              	.LCFI29:
+ 1556              		.cfi_def_cfa 11, 4
+ 1557 0eac 28D04DE2 		sub	sp, sp, #40
+ 1558 0eb0 20000BE5 		str	r0, [fp, #-32]
+ 1559 0eb4 24100BE5 		str	r1, [fp, #-36]
+ 1560 0eb8 28200BE5 		str	r2, [fp, #-40]
+ 1561 0ebc 2C300BE5 		str	r3, [fp, #-44]
+ 509:../standalone_spi/cyfx_gpio_spi_standalone.c ****     CyFxGpioSpiFrame_t frame;
+ 510:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 511:../standalone_spi/cyfx_gpio_spi_standalone.c ****     frame.txData = (tx24 & 0x00FFFFFFu);
+ 1562              		.loc 1 511 0
+ 1563 0ec0 24301BE5 		ldr	r3, [fp, #-36]
+ 1564 0ec4 FF34C3E3 		bic	r3, r3, #-16777216
+ 1565 0ec8 18300BE5 		str	r3, [fp, #-24]
+ 512:../standalone_spi/cyfx_gpio_spi_standalone.c ****     frame.rxData = rx24;
+ 1566              		.loc 1 512 0
+ 1567 0ecc 28301BE5 		ldr	r3, [fp, #-40]
+ 1568 0ed0 14300BE5 		str	r3, [fp, #-20]
+ 513:../standalone_spi/cyfx_gpio_spi_standalone.c ****     frame.bitCount = 24u;
+ 1569              		.loc 1 513 0
+ 1570 0ed4 1830A0E3 		mov	r3, #24
+ 1571 0ed8 10304BE5 		strb	r3, [fp, #-16]
+ 514:../standalone_spi/cyfx_gpio_spi_standalone.c ****     frame.keepChipSelect = CyFalse;
+ 1572              		.loc 1 514 0
+ 1573 0edc 0030A0E3 		mov	r3, #0
+ 1574 0ee0 0C300BE5 		str	r3, [fp, #-12]
+ 515:../standalone_spi/cyfx_gpio_spi_standalone.c ****     frame.useShortCriticalSection = irqGuard;
+ 1575              		.loc 1 515 0
+ 1576 0ee4 2C301BE5 		ldr	r3, [fp, #-44]
+ 1577 0ee8 08300BE5 		str	r3, [fp, #-8]
+ 516:../standalone_spi/cyfx_gpio_spi_standalone.c **** 
+ 517:../standalone_spi/cyfx_gpio_spi_standalone.c ****     return CyFxGpioSpiWorkerTransferFrame (worker, &frame, waitOption);
+ 1578              		.loc 1 517 0
+ 1579 0eec 18304BE2 		sub	r3, fp, #24
+ 1580 0ef0 20001BE5 		ldr	r0, [fp, #-32]
+ 1581 0ef4 0310A0E1 		mov	r1, r3
+ 1582 0ef8 04209BE5 		ldr	r2, [fp, #4]
+ 1583 0efc FEFFFFEB 		bl	CyFxGpioSpiWorkerTransferFrame
+ 1584 0f00 0030A0E1 		mov	r3, r0
+ 518:../standalone_spi/cyfx_gpio_spi_standalone.c **** }
+ 1585              		.loc 1 518 0
+ 1586 0f04 0300A0E1 		mov	r0, r3
+ 1587 0f08 04D04BE2 		sub	sp, fp, #4
+ 1588              		@ sp needed
+ 1589 0f0c 0088BDE8 		ldmfd	sp!, {fp, pc}
+ 1590              		.cfi_endproc
+ 1591              	.LFE14:
+ 1593              	.Letext0:
+ 1594              		.file 2 "c:\\program files (x86)\\cypress\\ez-usb fx3 sdk\\1.3\\arm gcc\\arm-none-eabi\\include\\s
+ 1595              		.file 3 "C:\\Program Files (x86)\\Cypress\\EZ-USB FX3 SDK\\1.3\\firmware\\u3p_firmware\\inc/cyu3ty
+ 1596              		.file 4 "C:\\Program Files (x86)\\Cypress\\EZ-USB FX3 SDK\\1.3\\firmware\\u3p_firmware\\inc/tx_por
+ 1597              		.file 5 "C:\\Program Files (x86)\\Cypress\\EZ-USB FX3 SDK\\1.3\\firmware\\u3p_firmware\\inc/tx_api
+ 1598              		.file 6 "C:\\Program Files (x86)\\Cypress\\EZ-USB FX3 SDK\\1.3\\firmware\\u3p_firmware\\inc/cyu3er
+ 1599              		.file 7 "C:\\Program Files (x86)\\Cypress\\EZ-USB FX3 SDK\\1.3\\firmware\\u3p_firmware\\inc/cyu3gp
+ 1600              		.file 8 "../standalone_spi/cyfx_gpio_spi_standalone.h"
+DEFINED SYMBOLS
+                            *ABS*:00000000 cyfx_gpio_spi_standalone.c
+C:\Users\liuxin\AppData\Local\Temp\ccuPucAk.s:16     .text:00000000 $a
+C:\Users\liuxin\AppData\Local\Temp\ccuPucAk.s:18     .text:00000000 CyFxGpioSpiDelayHalfCycle
+C:\Users\liuxin\AppData\Local\Temp\ccuPucAk.s:76     .text:00000074 CyFxGpioSpiSetClock
+C:\Users\liuxin\AppData\Local\Temp\ccuPucAk.s:110    .text:000000ac CyFxGpioSpiSetMosi
+C:\Users\liuxin\AppData\Local\Temp\ccuPucAk.s:144    .text:000000e4 CyFxGpioSpiSetCs
+C:\Users\liuxin\AppData\Local\Temp\ccuPucAk.s:178    .text:0000011c CyFxGpioSpiBitIndex
+C:\Users\liuxin\AppData\Local\Temp\ccuPucAk.s:227    .text:0000017c CyFxGpioSpiConfigurePins
+C:\Users\liuxin\AppData\Local\Temp\ccuPucAk.s:357    .text:000002c0 CyFxGpioSpiInit
+C:\Users\liuxin\AppData\Local\Temp\ccuPucAk.s:505    .text:00000448 CyFxGpioSpiDeInit
+C:\Users\liuxin\AppData\Local\Temp\ccuPucAk.s:569    .text:000004cc CyFxGpioSpiSetBitRateHint
+C:\Users\liuxin\AppData\Local\Temp\ccuPucAk.s:646    .text:00000584 $d
+C:\Users\liuxin\AppData\Local\Temp\ccuPucAk.s:651    .text:0000058c $a
+C:\Users\liuxin\AppData\Local\Temp\ccuPucAk.s:654    .text:0000058c CyFxGpioSpiTransferFrame
+C:\Users\liuxin\AppData\Local\Temp\ccuPucAk.s:1041   .text:00000998 CyFxGpioSpiWorkerEntry
+C:\Users\liuxin\AppData\Local\Temp\ccuPucAk.s:1136   .rodata:00000000 $d
+C:\Users\liuxin\AppData\Local\Temp\ccuPucAk.s:1143   .text:00000a80 CyFxGpioSpiWorkerCreate
+C:\Users\liuxin\AppData\Local\Temp\ccuPucAk.s:1350   .text:00000cd8 $d
+C:\Users\liuxin\AppData\Local\Temp\ccuPucAk.s:1355   .text:00000ce0 $a
+C:\Users\liuxin\AppData\Local\Temp\ccuPucAk.s:1358   .text:00000ce0 CyFxGpioSpiWorkerDestroy
+C:\Users\liuxin\AppData\Local\Temp\ccuPucAk.s:1434   .text:00000d8c CyFxGpioSpiWorkerTransferFrame
+C:\Users\liuxin\AppData\Local\Temp\ccuPucAk.s:1543   .text:00000ea4 CyFxGpioSpiWorkerTransfer24
+                     .debug_frame:00000010 $d
+
+UNDEFINED SYMBOLS
+CyFx3BusyWait
+CyU3PGpioSetValue
+CyU3PMemSet
+CyU3PGpioSetSimpleConfig
+memcpy
+_txe_mutex_create
+_txe_mutex_delete
+__aeabi_uidiv
+_txe_mutex_get
+_txe_mutex_put
+CyU3PEnterCriticalSection
+CyU3PExitCriticalSection
+CyU3PGpioGetValue
+_txe_event_flags_get
+_txe_event_flags_set
+_txe_event_flags_create
+_txe_event_flags_delete
+_txe_thread_create
+_tx_thread_sleep
+CyU3PThreadTerminate
+CyU3PThreadDelete
