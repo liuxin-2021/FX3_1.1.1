@@ -3,6 +3,7 @@
 #include "cyu3utils.h"
 #include "cyu3vic.h"
 #include "gpio_regs.h"
+#include "cyfxslfifosync.h"
 #include "cyfx_gpio_spi_standalone.h"
 
 #define CYFX_SPI_MIN_BITCOUNT   (1u)
@@ -11,10 +12,10 @@
 #define CYFX_SPI_WORKER_STACK_SIZE    (0x0800u)
 #define CYFX_SPI_WORKER_PRIORITY      (5u)
 
-#define CYFX_SPI_GPIO_CLK             (22u)
-#define CYFX_SPI_GPIO_MOSI            (25u)
-#define CYFX_SPI_GPIO_MISO            (26u)
-#define CYFX_SPI_GPIO_CS_FPGA         (50u)
+#define CYFX_SPI_GPIO_CLK             ((uint8_t)FX3_SPI_CLK)
+#define CYFX_SPI_GPIO_MOSI            ((uint8_t)FX3_SPI_MOSI)
+#define CYFX_SPI_GPIO_MISO            ((uint8_t)FX3_SPI_MISO)
+#define CYFX_SPI_GPIO_CS_FPGA         ((uint8_t)FX3_SPI_SS_FPGA)
 
 #define CYFX_SPI_SIMPLE_GPIO_MAX_ID   (60u)
 
@@ -459,6 +460,7 @@ CyFxGpioSpiInit (CyFxGpioSpiContext_t *ctx,
                  const CyFxGpioSpiPinMap_t *pinMap,
                  const CyFxGpioSpiTiming_t *timing)
 {
+    CyU3PGpioSimpleConfig_t csSafeCfg;
     CyU3PReturnStatus_t status;
 
     if ((ctx == 0) || (pinMap == 0) || (timing == 0))
@@ -469,6 +471,25 @@ CyFxGpioSpiInit (CyFxGpioSpiContext_t *ctx,
     CyU3PMemSet ((uint8_t *)ctx, 0, sizeof(*ctx));
     ctx->pinMap = *pinMap;
     ctx->timing = *timing;
+
+    /* Force CS high before touching other SPI pins to avoid a false select window. */
+    status = CyU3PDeviceGpioOverride (pinMap->cs, CyTrue);
+    if (status != CY_U3P_SUCCESS)
+    {
+        return status;
+    }
+
+    CyU3PMemSet ((uint8_t *)&csSafeCfg, 0, sizeof(csSafeCfg));
+    csSafeCfg.outValue = CyTrue;
+    csSafeCfg.driveLowEn = CyTrue;
+    csSafeCfg.driveHighEn = CyTrue;
+    csSafeCfg.inputEn = CyFalse;
+    csSafeCfg.intrMode = CY_U3P_GPIO_NO_INTR;
+    status = CyU3PGpioSetSimpleConfig (pinMap->cs, &csSafeCfg);
+    if (status != CY_U3P_SUCCESS)
+    {
+        return status;
+    }
 
     status = CyFxGpioSpiOverridePins (pinMap);
     if (status != CY_U3P_SUCCESS)

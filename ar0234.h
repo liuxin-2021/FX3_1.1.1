@@ -67,6 +67,8 @@ extern void TemperatureMonitor_Process(void);
 extern void AR0234_Context_Init ();
 extern void AR0234_Write_Sensor1(uint16_t  regAddr,uint16_t  regData);
 extern void AR0234_Write_Sensor2(uint16_t  regAddr,uint16_t  regData);
+extern uint16_t CyFxGetSensor1param(uint16_t sensoraddr);
+extern uint16_t CyFxGetSensor2param(uint16_t sensoraddr);
 
 extern void AR0234_DumpCoreModeRegisters_Sequential100ms(void);
 

@@ -26,6 +26,7 @@
 #define CY_FX_APP_SELF_INIT_EVENT        (1 << 3)   /* Request device self-init in thread context. */
 /* Runtime IO matrix GPIO[63:32] bitmap. Keep this in sync with CyFxApplicationDefine. */
 #define CY_FX_RUNTIME_GPIO_SIMPLE_EN1    (0x121C2000u)
+#define CY_FX_BINNING_SETTLE_DELAY_MS    (100u)
 //#define DEF_UART_BAUDRATE                (115200)    /* Baud rate for UART communication. */
 CyU3PEvent glFxGpioAppEvent;            /* GPIO input event group. */
 CyU3PThread slHeatingAppThread;            /* Temperature monitor application thread structure  */
@@ -1435,20 +1436,9 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
     uint16_t wValue, wIndex, wLength;
     CyBool_t isHandled = CyFalse;
     uint8_t  wGain_t;
-    //uint8_t	 Gain_t;
-    //uint16_t wGain;
-    //uint8_t  wValue_l,wValue_h;
     uint8_t  wValue_l;
-    //CyBool_t button1Value = CyFalse,button2Value = CyFalse;
-
-    //uint16_t RGB_Gain,MONO_Gain;
     CyU3PReturnStatus_t status = CY_U3P_SUCCESS;
     CyBool_t TouchSWitch1,TouchSwitch2;
-    // CyBool_t TouchSWitch11,TouchSwitch22;
-
-    //CyBool_t SclGpioValue;
-    //uint8_t i;
-
 
     /* Decode the fields from the setup request. */
     bReqType = (setupdat0 & CY_U3P_USB_REQUEST_TYPE_MASK);
@@ -1767,37 +1757,6 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
 					break;
 				}
 
-
-
-                case CY_FX_RQT_READ_IIC_SCL_GPIO:
-
-                	CyU3PMemSet(glEp0Buffer, 0, sizeof(glEp0Buffer));
-                    #ifdef IIC_ORDINARY_GPIO
-                	CyU3PGpioGetValue (IIC_SCL_GPIO, &SclGpioValue);
-                    #endif
-
-                	glEp0Buffer[0] =  SclGpioValue;
-
-                	//读取10次大扫描头高低电平，高电平传输1，低电平传输0；
-                	for(i=0;i<10;i++)
-                	{
-                		CyU3PGpioGetValue (BUTTON1_ON, &TouchSWitch1);
-                		glEp0Buffer[i] = TouchSWitch1;
-                	}
-
-
-                	//读取10次小扫描头高低电平，高电平传输1，低电平传输0；
-                	for(i=0;i<10;i++)
-                	{
-                		CyU3PGpioGetValue (BUTTON2_ON, &TouchSwitch2);
-                		glEp0Buffer[10+i] = TouchSwitch2;
-                	}
-
-             	    CyU3PUsbSendEP0Data(20,glEp0Buffer);
-
-                	break;
-
-
                 case CY_FX_RQT_STATUS_DEVICE:
                 {
 	                uint8_t statusDeviceRaw = 0;
@@ -1853,6 +1812,7 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
 					CyFxApplyBinningMode (workmode);
 					CyU3PUsbAckSetup ();
 					break;
+					
 				case CY_FX_LASER_CYCLE_SETTING:
 
 				  	currentData.laserPeriod = ((uint32_t)(wValue*50000));//value单位是毫秒
@@ -1916,6 +1876,11 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
 					CyFxSpiProtoWrite8 (0x01, 0xa8, (uint8_t)(currentData.greenLightPWM >> 8));
 					CyFxSpiProtoWrite8 (0x01, 0xa9, (uint8_t)(currentData.greenLightPWM));
 					CyU3PUsbAckSetup ();
+					CyU3PDebugPrint (4, "FPGA ver[0-3]: %d %d %d %d\n",
+					    glFpgaVersion[0], glFpgaVersion[1], glFpgaVersion[2], glFpgaVersion[3]);
+					CyU3PDebugPrint (4, "FPGA ver[4-7]: %d %d %d %d\n",
+					    glFpgaVersion[4], glFpgaVersion[5], glFpgaVersion[6], glFpgaVersion[7]);
+					
 					break;
 
 				case CY_FX_WHITE_LIGHT:
@@ -2057,12 +2022,8 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
                 	}
 
                     status = CyU3PUsbGetEP0Data (wLength, glEp0Calibration, NULL);
-                    //if (status == CY_U3P_SUCCESS)
-                    //{
-                    	//chip = wValue & 0x03;                                //  store chip selection
                         status = CyFxSpiFx3Transfer (wIndex, wLength,
                         		glEp0Calibration, CyFalse);
-                    //}
                     break;
                 case CY_FX_RQT_SPI_FLASH_ERASE_Cali_LCC:
                     CyU3PMemSet (glEp0Buffer, 0, sizeof (glEp0Buffer));
@@ -2132,7 +2093,8 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
 					CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
 					CyU3PUsbAckSetup ();
 					break;
-
+               
+				 //设置曝光d6
                 case CY_FX_RQT_COMMAND_EXPOSURE:
 
                 	AR0234ContextConfig.laserExposureSensor2 = (uint16_t)(wValue);
@@ -2565,7 +2527,6 @@ void CyFxSlFifoApplnInit (void)
 	apiRetStatus = CyU3PGpioSetSimpleConfig (FX3_DEVICE_RESET, &gpioConfig);
 	gpioConfig.outValue = CyTrue;
 	apiRetStatus = CyU3PGpioSetSimpleConfig (FX3_SNAP, &gpioConfig);
-	apiRetStatus = CyU3PGpioSetSimpleConfig (FX3_HALL, &gpioConfig);
 
 	  // 配置输入GPIO（按钮）
 	gpioConfig.outValue    = CyFalse;
@@ -2916,7 +2877,7 @@ void slMagneticSwitchAppThread_Entry (uint32_t input)
 	}
 }
 
-#define CY_FX_BINNING_SETTLE_DELAY_MS    (100u)
+
 
 static void
 CyFxAr0234WritePairAndCommit (uint16_t regAddr, uint16_t regData)

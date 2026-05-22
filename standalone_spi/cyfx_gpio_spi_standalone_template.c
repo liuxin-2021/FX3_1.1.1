@@ -1,14 +1,15 @@
 #include "cyu3error.h"
 #include "cyu3utils.h"
+#include "cyfxslfifosync.h"
 #include "cyfx_gpio_spi_standalone.h"
 
 #define CYFX_SPI_WORKER_STACK_SIZE    (0x0800u)
 #define CYFX_SPI_WORKER_PRIORITY      (5u)
 
-#define CYFX_SPI_GPIO_CLK             (22u)
-#define CYFX_SPI_GPIO_MOSI            (25u)
-#define CYFX_SPI_GPIO_MISO            (26u)
-#define CYFX_SPI_GPIO_CS_FPGA         (50u)
+#define CYFX_SPI_GPIO_CLK             ((uint8_t)FX3_SPI_CLK)
+#define CYFX_SPI_GPIO_MOSI            ((uint8_t)FX3_SPI_MOSI)
+#define CYFX_SPI_GPIO_MISO            ((uint8_t)FX3_SPI_MISO)
+#define CYFX_SPI_GPIO_CS_FPGA         ((uint8_t)FX3_SPI_SS_FPGA)
 
 #define CYFX_SPI_TEMPLATE_BITRATE_HZ      (1000000u)
 #define CYFX_SPI_TEMPLATE_DELAY_CYCLES    (20u)

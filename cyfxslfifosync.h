@@ -97,12 +97,8 @@
 
 
 #define BURST_LEN 16   //16
-
-// GPIO(11lines) USED FOR: a. SPI(5lines); b. control(6lines);
-//a. SPI =  CLK(1line) + MOSI(1line) + MISO(1line) + SS(2lines)
-//b. control = power enable(2lines) + global control(2lines) + input(2lines)
 //  ------------- SPI BUS --------------
-#define FX3_SPI_CLK             (22) /* GPIO Id 22[flagb] will be used for providing SPI Clock */
+#define FX3_SPI_CLK             (22)/* GPIO Id 22[flagb] will be used for providing SPI Clock */
 #define FX3_SPI_MOSI            (25) /* GPIO Id 25[flagc] will be used as MOSI line */
 #define FX3_SPI_MISO            (26) /* GPIO Id 26[flagd] will be used as MISO line */
 #define FX3_SPI_SS_FPGA         (50) /* GPIO Id 50 will be used as slave select fpga     low active */
@@ -110,19 +106,15 @@
 /* 定义磁吸开关GPIO */
 #define FX3_GPIO_HALL           (51) /* GPIO Id 51 will be used as hall sensor */
 //  ------------- GPIO(OUTPUT) --------------
-#define FPGA_PWR_EN             (23)//(27) /* OUTPUT: GPIO Id 27 will be used as power FPGA           high active */
-#define FX3_DEVICE_RESET        (52) /* OUTPUT: GPIO Id 52 will be used as reset device         low  active */
-#define FX3_SNAP                (60) /* OUTPUT: GPIO Id 60 will be used as snap                 low  active */
-#define FX3_HALL                (57) /* OUTPUT: GPIO Id 57 will be used as fx3_snap for transportation data   low  active */
+#define FPGA_PWR_EN             (23)
+#define FX3_DEVICE_RESET        (52) 
+#define FX3_SNAP                (60) 
 
-//  ------------- GPIO(INPUT) --------------
-//#define BUTTON                  (45) /* INPUT:  GPIO Id 45 will be used as button status        low  active */
-#define BUTTON                  (27)//(23) /* INPUT:  GPIO Id 45 will be used as button status        low  active */
-//#define HALL                    (57) /* INPUT:  GPIO Id 57 will be used as hall   status        low  active */
 
-#define BUTTON1_ON                    (45) /* INPUT:  GPIO Id 45 will be used as button1   status        low  active */
-#define BUTTON2_ON                    (57) /* INPUT:  GPIO Id 57 will be used as button2   status        low  active */
 
+#define BUTTON                  (27)
+#define BUTTON1_ON                    (45) 
+#define BUTTON2_ON                    (57) 
 
 
 
@@ -157,7 +149,6 @@
 #define  CY_FX_RQT_COMMAND_MAGNETIC                   (0xA3)  //never issued
 #define  CY_FX_RQT_COMMAND_CLOSE_DEVICE               (0xA4)  //never issued
 #define  CY_FX_RQT_COMMAND_OPEN_DEVICE                (0xA5)  //never issued
-#define  CY_FX_RQT_READ_IIC_SCL_GPIO       		 	  (0xA6)  //读取IIC-SCL引脚通过GPIO时的高低电平值
 
 
 //B类功能
