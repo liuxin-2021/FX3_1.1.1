@@ -1521,6 +1521,10 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
 	                {
 	                	CyU3PDebugPrint (4, "FPGA version read failed: %d\n", (int)status);
 	                }
+					CyU3PDebugPrint (4, "FPGA ver[0-3]: %d %d %d %d\n",
+					    glFpgaVersion[0], glFpgaVersion[1], glFpgaVersion[2], glFpgaVersion[3]);
+					CyU3PDebugPrint (4, "FPGA ver[4-7]: %d %d %d %d\n",
+					    glFpgaVersion[4], glFpgaVersion[5], glFpgaVersion[6], glFpgaVersion[7]);
                 	CyU3PUsbSendEP0Data (16, glFpgaVersion);
 					break;
 
@@ -1876,11 +1880,6 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
 					CyFxSpiProtoWrite8 (0x01, 0xa8, (uint8_t)(currentData.greenLightPWM >> 8));
 					CyFxSpiProtoWrite8 (0x01, 0xa9, (uint8_t)(currentData.greenLightPWM));
 					CyU3PUsbAckSetup ();
-					CyU3PDebugPrint (4, "FPGA ver[0-3]: %d %d %d %d\n",
-					    glFpgaVersion[0], glFpgaVersion[1], glFpgaVersion[2], glFpgaVersion[3]);
-					CyU3PDebugPrint (4, "FPGA ver[4-7]: %d %d %d %d\n",
-					    glFpgaVersion[4], glFpgaVersion[5], glFpgaVersion[6], glFpgaVersion[7]);
-					
 					break;
 
 				case CY_FX_WHITE_LIGHT:
