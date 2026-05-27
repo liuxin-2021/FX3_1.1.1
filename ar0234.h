@@ -9,9 +9,9 @@
 #include "cyu3externcend.h"
 
 
-#ifndef AR0234_DIAG_DEBUG
-#define AR0234_DIAG_DEBUG 1
-#endif
+//#ifndef AR0234_DIAG_DEBUG
+//#define AR0234_DIAG_DEBUG  
+//#endif
 
 #define  IIC_AR0234_RGB_ADDRESS                     (0x20)   //AR0234_RGB iic addres
 #define  IIC_AR0234_MONO_ADDRESS                    (0x30)   //AR0234_RGB iic addres

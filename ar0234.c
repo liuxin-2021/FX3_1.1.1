@@ -182,8 +182,8 @@ uint16_t CyFxGetSensor1param(uint16_t sensoraddr)
     CyFxSpiProtoWrite8 (0x01, 0x82, registerAddrHigh);
 	CyFxSpiProtoWrite8 (0x01, 0x83, registerAddrLow);
 	CyFxSpiProtoWrite8 (0x01, 0x81, 0x22);
-	CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
-	CyU3PThreadSleep (50); 
+	CyFxSpiProtoWrite8 (0x01, 0x81, 0x00); 
+	CyU3PThreadSleep (50);
 	(void)CyFxSpiProtoReadSelectedStatus8 (0x01, &dataHigh);
 	(void)CyFxSpiProtoReadSelectedStatus8 (0x02, &dataLow);
 	(void)CyFxSpiProtoWrite8 (0x02, 0xff, 0x00);
@@ -211,7 +211,7 @@ uint16_t CyFxGetSensor2param(uint16_t sensoraddr)
 	CyFxSpiProtoWrite8 (0x01, 0x93, registerAddrLow);
 	CyFxSpiProtoWrite8 (0x01, 0x81, 0x22);
 	CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
-	CyU3PThreadSleep (50); 
+	CyU3PThreadSleep (50);
 	(void)CyFxSpiProtoReadSelectedStatus8 (0x03, &dataHigh);
 	(void)CyFxSpiProtoReadSelectedStatus8 (0x04, &dataLow);
 	(void)CyFxSpiProtoWrite8 (0x02, 0xff, 0x00);

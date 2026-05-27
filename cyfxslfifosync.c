@@ -27,6 +27,7 @@
 /* Runtime IO matrix GPIO[63:32] bitmap. Keep this in sync with CyFxApplicationDefine. */
 #define CY_FX_RUNTIME_GPIO_SIMPLE_EN1    (0x121C2000u)
 #define CY_FX_BINNING_SETTLE_DELAY_MS    (100u)
+#define CY_FX_BINNING_VERIFY_RETRY_DELAY_MS (20u)
 //#define DEF_UART_BAUDRATE                (115200)    /* Baud rate for UART communication. */
 CyU3PEvent glFxGpioAppEvent;            /* GPIO input event group. */
 CyU3PThread slHeatingAppThread;            /* Temperature monitor application thread structure  */
@@ -89,7 +90,9 @@ typedef enum CyFxDeviceReadyState_e {
 
 static volatile CyFxDeviceReadyState_t glDeviceReadyState = CY_FX_DEVICE_READY_NOT_READY;
 
-static void CyFxApplyBinningMode (uint8_t mode);
+static CyBool_t CyFxApplyBinningMode (uint8_t mode);
+static CyBool_t CyFxVerifyBinningModeReadback (uint8_t mode);
+static CyBool_t CyFxVerifyOffsetReadback (void);
 static void CyFxUpdateDeviceReadyState (CyFxDeviceReadyState_t newState);
 static void CyFxScheduleSelfInit (void);
 static void CyFxRunSelfInit (void);
@@ -1813,10 +1816,18 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
 
 				case CY_FX_BINNING_STATE:
 					workmode = (uint8_t)(wValue & 0xff);
-					CyFxApplyBinningMode (workmode);
-					CyU3PUsbAckSetup ();
+					if (CyFxApplyBinningMode (workmode) == CyTrue)
+					{
+						CyU3PUsbAckSetup ();
+						CyU3PDebugPrint (4, "BINNING request successful, mode=%d\n", workmode);
+					}
+					else
+					{
+						CyU3PDebugPrint (4, "BINNING request failed, mode=%d\n", workmode);
+						CyU3PUsbStall (0, CyTrue, CyFalse);
+					}
 					break;
-					
+			
 				case CY_FX_LASER_CYCLE_SETTING:
 
 				  	currentData.laserPeriod = ((uint32_t)(wValue*50000));//value单位是毫秒
@@ -1891,8 +1902,9 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
 					CyFxSpiProtoWrite8 (0x01, 0xab, (uint8_t)(currentData.whiteLightPWM >> 8));
 					CyFxSpiProtoWrite8 (0x01, 0xac, (uint8_t)(currentData.whiteLightPWM));
 					CyU3PUsbAckSetup ();
+					TemperatureMonitor_Start();
 					break;
-
+				
 				case CY_FX_RQT_GYRO_CONTROL:
 				{
 					/* 只处理 OUT 方向（主机写） */
@@ -2034,7 +2046,7 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
                 	 glMode    =  wValue & 0x0f;
 					 CyU3PUsbAckSetup ();
 					break;
-
+               
                 case CY_FX_RQT_COMMAND_CAPTURE:
 	                // STEP1: 仅在首帧（glIsSnapActive=true）时发SPI复位PingPong，后续帧用GPIO SNAP驱动
 	                if(glIsSnapActive)
@@ -2069,7 +2081,7 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
 					}
 						CyU3PUsbAckSetup ();
 					break;
-
+                
                 //设置增益d5
                 case CY_FX_RQT_COMMAND_SETGAIN:
 
@@ -2092,7 +2104,7 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
 					CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
 					CyU3PUsbAckSetup ();
 					break;
-               
+                
 				 //设置曝光d6
                 case CY_FX_RQT_COMMAND_EXPOSURE:
 
@@ -2110,7 +2122,7 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
 					CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
 					CyU3PUsbAckSetup ();
 					break;
-
+                
                 case 0xc7:
 
                 	CyU3PUsbAckSetup ();
@@ -2127,7 +2139,8 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
 				    CyU3PUsbAckSetup ();
 					break;
                 #endif
-					//设置偏移量d0
+			
+					//设置偏移量D8：收到一条即下发并读回一条，不再等待第8次统一下发
                 case CY_FX_RQT_COMMAND_SETOFFSET:
 
                 	if (wIndex >= 0x01 && wIndex <= 0x04) //sensor1设置//
@@ -2187,53 +2200,56 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
                 			AR0234_Write_Sensor2(0x3002,(uint16_t)(AR0234ContextConfig.laserOffsetSensor2_y_start)); //激光//
                 			AR0234_Write_Sensor1(0x3002,(uint16_t)(AR0234ContextConfig.laserOffsetSensor1_y_start)); //激光//
 						  	CyFxSpiProtoWrite8 (0x01, 0x81, 0x11);
-					  	    CyU3PThreadSleep (2); /* wait for FPGA I2C proxy to complete */
 					        CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
 
                             AR0234_Write_Sensor2(0x308C,(uint16_t)(AR0234ContextConfig.whiteOffsetSensor2_y_start)); //白光//
                             AR0234_Write_Sensor1(0x308C,(uint16_t)(AR0234ContextConfig.whiteOffsetSensor1_y_start)); //白光//
 					  	    CyFxSpiProtoWrite8 (0x01, 0x81, 0x11);
-					  	    CyU3PThreadSleep (2); /* wait for FPGA I2C proxy to complete */
 					        CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
 
                             //x_start//
                   			AR0234_Write_Sensor2(0x3004,(uint16_t)(AR0234ContextConfig.laserOffsetSensor2_x_start)); //激光//
                     		AR0234_Write_Sensor1(0x3004,(uint16_t)(AR0234ContextConfig.laserOffsetSensor1_x_start)); //激光//
 					        CyFxSpiProtoWrite8 (0x01, 0x81, 0x11);
-					        CyU3PThreadSleep (2); /* wait for FPGA I2C proxy to complete */
 					        CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
 
                     		AR0234_Write_Sensor2(0x308A,(uint16_t)(AR0234ContextConfig.whiteOffsetSensor2_x_start)); //白光//
                     		AR0234_Write_Sensor1(0x308A,(uint16_t)(AR0234ContextConfig.whiteOffsetSensor1_x_start)); //白光//
 					        CyFxSpiProtoWrite8 (0x01, 0x81, 0x11);
-					        CyU3PThreadSleep (2); /* wait for FPGA I2C proxy to complete */
 					        CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
 
                             //y_end//
                    			AR0234_Write_Sensor2(0x3006,(uint16_t)(AR0234ContextConfig.laserOffsetSensor2_y_end)); //激光//
                    			AR0234_Write_Sensor1(0x3006,(uint16_t)(AR0234ContextConfig.laserOffsetSensor1_y_end)); //激光//
 					        CyFxSpiProtoWrite8 (0x01, 0x81, 0x11);
-					        CyU3PThreadSleep (2); /* wait for FPGA I2C proxy to complete */
 					        CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
 
                    			AR0234_Write_Sensor2(0x3090,(uint16_t)(AR0234ContextConfig.whiteOffsetSensor2_y_end)); //白光//
                    			AR0234_Write_Sensor1(0x3090,(uint16_t)(AR0234ContextConfig.whiteOffsetSensor1_y_end)); //白光//
 					   	    CyFxSpiProtoWrite8 (0x01, 0x81, 0x11);
-					   	    CyU3PThreadSleep (2); /* wait for FPGA I2C proxy to complete */
 					        CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
-
                             //x_end//
                 			AR0234_Write_Sensor2(0x3008,(uint16_t)(AR0234ContextConfig.laserOffsetSensor2_x_end)); //激光//
                 			AR0234_Write_Sensor1(0x3008,(uint16_t)(AR0234ContextConfig.laserOffsetSensor1_x_end)); //激光//
 					  	    CyFxSpiProtoWrite8 (0x01, 0x81, 0x11);
-					  	    CyU3PThreadSleep (2); /* wait for FPGA I2C proxy to complete */
 					        CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
 
                 			AR0234_Write_Sensor2(0x308E,(uint16_t)(AR0234ContextConfig.whiteOffsetSensor2_x_end)); //白光//
                 			AR0234_Write_Sensor1(0x308E,(uint16_t)(AR0234ContextConfig.whiteOffsetSensor1_x_end)); //白光//
 					  	    CyFxSpiProtoWrite8 (0x01, 0x81, 0x11);
-					  	    CyU3PThreadSleep (2); /* wait for FPGA I2C proxy to complete */
-                            TemperatureMonitor_Start();
+					  	    CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
+							if (CyFxVerifyOffsetReadback () == CyFalse)
+							{
+								CyU3PDebugPrint (4, "OFFSET request failed (readback mismatch).\n");
+								CyU3PUsbStall (0, CyTrue, CyFalse);
+								break;
+							}
+							else
+							{
+								CyU3PDebugPrint (4, "OFFSET request successful, x_start=%d, y_start=%d, x_end=%d, y_end=%d\n",
+									AR0234ContextConfig.laserOffsetSensor2_x_start, AR0234ContextConfig.laserOffsetSensor2_y_start,
+									AR0234ContextConfig.laserOffsetSensor2_x_end, AR0234ContextConfig.laserOffsetSensor2_y_end);
+							}
                     	}
                 	}
   					CyU3PThreadSleep (10);
@@ -2831,8 +2847,6 @@ void SlFifoAppThread_Entry (uint32_t input)
 					{
 						// 长按必关投影：无条件调用停止流程，避免因状态位不同步导致无效
 						CyFxButtonPressed_Stop();
-					
-
 						glStatus_Extra &= 0xbf;      // clear short press flag
 						glStatus_Extra |= 0x80;      // set long press flag
 						CyU3PThreadSleep(3000);                   //delay 3000ms
@@ -2884,11 +2898,149 @@ CyFxAr0234WritePairAndCommit (uint16_t regAddr, uint16_t regData)
 	AR0234_Write_Sensor2 (regAddr, regData);
 	AR0234_Write_Sensor1 (regAddr, regData);
 	CyFxSpiProtoWrite8 (0x01, 0x81, 0x11);
-	CyU3PThreadSleep (2); /* wait for FPGA I2C proxy to complete */
 	CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
 }
 
-static void
+static CyBool_t
+CyFxVerifyBinningRegPair (uint16_t regAddr, uint16_t expectedData)
+{
+	uint16_t sensor1Data = CyFxGetSensor1param (regAddr);
+	uint16_t sensor2Data = CyFxGetSensor2param (regAddr);
+
+	if ((sensor1Data != expectedData) || (sensor2Data != expectedData))
+	{
+		CyU3PThreadSleep (CY_FX_BINNING_VERIFY_RETRY_DELAY_MS);
+		sensor1Data = CyFxGetSensor1param (regAddr);
+		sensor2Data = CyFxGetSensor2param (regAddr);
+	}
+
+	if ((sensor1Data == expectedData) && (sensor2Data == expectedData))
+	{
+		return CyTrue;
+	}
+
+	CyU3PDebugPrint (4,
+			"BINNING verify fail: reg=%d exp=%d s1=%d s2=%d\n",
+			(unsigned int)regAddr,
+			(unsigned int)expectedData,
+			(unsigned int)sensor1Data,
+			(unsigned int)sensor2Data);
+
+	return CyFalse;
+}
+
+
+
+static CyBool_t
+CyFxVerifyBinningModeReadback (uint8_t mode)
+{
+	CyBool_t allPassed = CyTrue;
+
+	if (mode == normal_mode)
+	{
+		if (CyFxVerifyBinningRegPair (0x30B0, 0x0028) == CyFalse) { allPassed = CyFalse; }
+		if (CyFxVerifyBinningRegPair (0x3008, 0x0651) == CyFalse) { allPassed = CyFalse; }
+		if (CyFxVerifyBinningRegPair (0x308E, 0x0651) == CyFalse) { allPassed = CyFalse; }
+		if (CyFxVerifyBinningRegPair (0x30A2, 0x0001) == CyFalse) { allPassed = CyFalse; }
+		if (CyFxVerifyBinningRegPair (0x30A6, 0x0001) == CyFalse) { allPassed = CyFalse; }
+		if (CyFxVerifyBinningRegPair (0x3040, 0x0000) == CyFalse) { allPassed = CyFalse; }
+		if (CyFxVerifyBinningRegPair (0x30AE, 0x0001) == CyFalse) { allPassed = CyFalse; }
+		if (CyFxVerifyBinningRegPair (0x30A8, 0x0001) == CyFalse) { allPassed = CyFalse; }
+	}
+	else if (mode == binning_sum)
+	{
+		if (CyFxVerifyBinningRegPair (0x30B0, 0x00A8) == CyFalse) { allPassed = CyFalse; }
+		if (CyFxVerifyBinningRegPair (0x3008, 0x0655) == CyFalse) { allPassed = CyFalse; }
+		if (CyFxVerifyBinningRegPair (0x308E, 0x0655) == CyFalse) { allPassed = CyFalse; }
+		if (CyFxVerifyBinningRegPair (0x30A2, 0x0003) == CyFalse) { allPassed = CyFalse; }
+		if (CyFxVerifyBinningRegPair (0x30A6, 0x0003) == CyFalse) { allPassed = CyFalse; }
+		if (CyFxVerifyBinningRegPair (0x3040, 0x3C20) == CyFalse) { allPassed = CyFalse; }
+		if (CyFxVerifyBinningRegPair (0x30AE, 0x0003) == CyFalse) { allPassed = CyFalse; }
+		if (CyFxVerifyBinningRegPair (0x30A8, 0x0003) == CyFalse) { allPassed = CyFalse; }
+	}
+	else if (mode == binning_average)
+	{
+		if (CyFxVerifyBinningRegPair (0x30B0, 0x0028) == CyFalse) { allPassed = CyFalse; }
+		if (CyFxVerifyBinningRegPair (0x3008, 0x0655) == CyFalse) { allPassed = CyFalse; }
+		if (CyFxVerifyBinningRegPair (0x308E, 0x0655) == CyFalse) { allPassed = CyFalse; }
+		if (CyFxVerifyBinningRegPair (0x30A2, 0x0003) == CyFalse) { allPassed = CyFalse; }
+		if (CyFxVerifyBinningRegPair (0x30A6, 0x0003) == CyFalse) { allPassed = CyFalse; }
+		if (CyFxVerifyBinningRegPair (0x3040, 0x3C00) == CyFalse) { allPassed = CyFalse; }
+		if (CyFxVerifyBinningRegPair (0x30AE, 0x0003) == CyFalse) { allPassed = CyFalse; }
+		if (CyFxVerifyBinningRegPair (0x30A8, 0x0003) == CyFalse) { allPassed = CyFalse; }
+	}
+	else
+	{
+		CyU3PDebugPrint (4, "BINNING verify skip: unknown mode=%d\n", mode);
+		return CyFalse;
+	}
+
+	return allPassed;
+}
+
+static CyBool_t
+CyFxVerifyOffsetRegPair (uint16_t regAddr, uint16_t expectedSensor1Data, uint16_t expectedSensor2Data)
+{
+	uint16_t sensor1Data = CyFxGetSensor1param (regAddr);
+	uint16_t sensor2Data = CyFxGetSensor2param (regAddr);
+
+	if ((sensor1Data != expectedSensor1Data) || (sensor2Data != expectedSensor2Data))
+	{
+		CyU3PThreadSleep (CY_FX_BINNING_VERIFY_RETRY_DELAY_MS);
+		sensor1Data = CyFxGetSensor1param (regAddr);
+		sensor2Data = CyFxGetSensor2param (regAddr);
+	}
+
+	if ((sensor1Data == expectedSensor1Data) && (sensor2Data == expectedSensor2Data))
+	{
+		return CyTrue;
+	}
+
+	CyU3PDebugPrint (4,
+			"OFFSET verify fail: reg=%d exp1=%d exp2=%d s1=%d s2=%d\n",
+			(unsigned int)regAddr,
+			(unsigned int)expectedSensor1Data,
+			(unsigned int)expectedSensor2Data,
+			(unsigned int)sensor1Data,
+			(unsigned int)sensor2Data);
+
+	return CyFalse;
+}
+
+static CyBool_t
+CyFxVerifyOffsetReadback (void)
+{
+	CyBool_t allPassed = CyTrue;
+
+	if (CyFxVerifyOffsetRegPair (0x3002,
+			AR0234ContextConfig.laserOffsetSensor1_y_start,
+			AR0234ContextConfig.laserOffsetSensor2_y_start) == CyFalse) { allPassed = CyFalse; }
+	if (CyFxVerifyOffsetRegPair (0x308C,
+			AR0234ContextConfig.whiteOffsetSensor1_y_start,
+			AR0234ContextConfig.whiteOffsetSensor2_y_start) == CyFalse) { allPassed = CyFalse; }
+	if (CyFxVerifyOffsetRegPair (0x3004,
+			AR0234ContextConfig.laserOffsetSensor1_x_start,
+			AR0234ContextConfig.laserOffsetSensor2_x_start) == CyFalse) { allPassed = CyFalse; }
+	if (CyFxVerifyOffsetRegPair (0x308A,
+			AR0234ContextConfig.whiteOffsetSensor1_x_start,
+			AR0234ContextConfig.whiteOffsetSensor2_x_start) == CyFalse) { allPassed = CyFalse; }
+	if (CyFxVerifyOffsetRegPair (0x3006,
+			AR0234ContextConfig.laserOffsetSensor1_y_end,
+			AR0234ContextConfig.laserOffsetSensor2_y_end) == CyFalse) { allPassed = CyFalse; }
+	if (CyFxVerifyOffsetRegPair (0x3090,
+			AR0234ContextConfig.whiteOffsetSensor1_y_end,
+			AR0234ContextConfig.whiteOffsetSensor2_y_end) == CyFalse) { allPassed = CyFalse; }
+	if (CyFxVerifyOffsetRegPair (0x3008,
+			AR0234ContextConfig.laserOffsetSensor1_x_end,
+			AR0234ContextConfig.laserOffsetSensor2_x_end) == CyFalse) { allPassed = CyFalse; }
+	if (CyFxVerifyOffsetRegPair (0x308E,
+			AR0234ContextConfig.whiteOffsetSensor1_x_end,
+			AR0234ContextConfig.whiteOffsetSensor2_x_end) == CyFalse) { allPassed = CyFalse; }
+
+	return allPassed;
+}
+
+static CyBool_t
 CyFxApplyBinningMode (uint8_t mode)
 {
 	if (mode == normal_mode)
@@ -2901,9 +3053,18 @@ CyFxApplyBinningMode (uint8_t mode)
 		CyFxAr0234WritePairAndCommit (0x3040, 0x0000);
 		CyFxAr0234WritePairAndCommit (0x30AE, 0x0001);
 		CyFxAr0234WritePairAndCommit (0x30A8, 0x0001);
-		CyU3PThreadSleep (CY_FX_BINNING_SETTLE_DELAY_MS);
 		CyFxSpiProtoWrite8 (0x01, 0x86, 0x00); 
-		CyU3PDebugPrint(4, "Normal mode configuration done.\n");
+		CyU3PThreadSleep (CY_FX_BINNING_SETTLE_DELAY_MS);
+		if (CyFxVerifyBinningModeReadback (mode) == CyTrue)
+		{
+			CyU3PDebugPrint (4, "Normal mode configuration done (readback ok).\n");
+			return CyTrue;
+		}
+		else
+		{
+			CyU3PDebugPrint (4, "Normal mode readback verification failed.\n");
+			return CyFalse;
+		}
 	}
 	else if (mode == binning_sum)
 	{
@@ -2915,9 +3076,18 @@ CyFxApplyBinningMode (uint8_t mode)
 		CyFxAr0234WritePairAndCommit (0x3040, 0x3C20);
 		CyFxAr0234WritePairAndCommit (0x30AE, 0x0003);
 		CyFxAr0234WritePairAndCommit (0x30A8, 0x0003);
-		CyU3PThreadSleep (CY_FX_BINNING_SETTLE_DELAY_MS);
 		CyFxSpiProtoWrite8 (0x01, 0x86, 0x01); 
-		CyU3PDebugPrint(4, "Binning sum mode configuration done.\n");
+		CyU3PThreadSleep (CY_FX_BINNING_SETTLE_DELAY_MS);
+		if (CyFxVerifyBinningModeReadback (mode) == CyTrue)
+		{
+			CyU3PDebugPrint (4, "Binning sum mode configuration done (readback ok).\n");
+			return CyTrue;
+		}
+		else
+		{
+			CyU3PDebugPrint (4, "Binning sum mode readback verification failed.\n");
+			return CyFalse;
+		}
 	}
 	else if (mode == binning_average)
 	{
@@ -2929,9 +3099,23 @@ CyFxApplyBinningMode (uint8_t mode)
 		CyFxAr0234WritePairAndCommit (0x3040, 0x3C00);
 		CyFxAr0234WritePairAndCommit (0x30AE, 0x0003);
 		CyFxAr0234WritePairAndCommit (0x30A8, 0x0003);
-		CyU3PThreadSleep (CY_FX_BINNING_SETTLE_DELAY_MS);
 		CyFxSpiProtoWrite8 (0x01, 0x86, 0x01); 
-		CyU3PDebugPrint(4, "Binning average mode configuration done.\n");
+		CyU3PThreadSleep (CY_FX_BINNING_SETTLE_DELAY_MS);
+		if (CyFxVerifyBinningModeReadback (mode) == CyTrue)
+		{
+			CyU3PDebugPrint (4, "Binning average mode configuration done (readback ok).\n");
+			return CyTrue;
+		}
+		else
+		{
+			CyU3PDebugPrint (4, "Binning average mode readback verification failed.\n");
+			return CyFalse;
+		}
+	}
+	else
+	{
+		CyU3PDebugPrint (4, "BINNING mode unsupported: %d\n", mode);
+		return CyFalse;
 	}
 }
 /* JY901 陀螺仪数据流线程入口 */
