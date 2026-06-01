@@ -305,17 +305,17 @@
  290              		.file 3 "c:\\program files (x86)\\cypress\\ez-usb fx3 sdk\\1.3\\arm gcc\\arm-none-eabi\\include\\s
 DEFINED SYMBOLS
                             *ABS*:00000000 cyfxslfifousbdscr.c
-C:\Users\liuxin\AppData\Local\Temp\ccSSXQaT.s:21     .rodata:00000000 CyFxUSB30DeviceDscr
-C:\Users\liuxin\AppData\Local\Temp\ccSSXQaT.s:18     .rodata:00000000 $d
-C:\Users\liuxin\AppData\Local\Temp\ccSSXQaT.s:44     .rodata:00000020 CyFxUSB20DeviceDscr
-C:\Users\liuxin\AppData\Local\Temp\ccSSXQaT.s:67     .rodata:00000040 CyFxUSBBOSDscr
-C:\Users\liuxin\AppData\Local\Temp\ccSSXQaT.s:94     .rodata:00000060 CyFxUSBDeviceQualDscr
-C:\Users\liuxin\AppData\Local\Temp\ccSSXQaT.s:109    .rodata:00000080 CyFxUSBSSConfigDscr
-C:\Users\liuxin\AppData\Local\Temp\ccSSXQaT.s:158    .rodata:000000c0 CyFxUSBHSConfigDscr
-C:\Users\liuxin\AppData\Local\Temp\ccSSXQaT.s:202    .rodata:00000100 CyFxUSBFSConfigDscr
-C:\Users\liuxin\AppData\Local\Temp\ccSSXQaT.s:246    .rodata:00000140 CyFxUSBStringLangIDDscr
-C:\Users\liuxin\AppData\Local\Temp\ccSSXQaT.s:255    .rodata:00000160 CyFxUSBManufactureDscr
-C:\Users\liuxin\AppData\Local\Temp\ccSSXQaT.s:276    .rodata:00000180 CyFxUSBProductDscr
+C:\Users\liuxin\AppData\Local\Temp\ccVZiiIp.s:21     .rodata:00000000 CyFxUSB30DeviceDscr
+C:\Users\liuxin\AppData\Local\Temp\ccVZiiIp.s:18     .rodata:00000000 $d
+C:\Users\liuxin\AppData\Local\Temp\ccVZiiIp.s:44     .rodata:00000020 CyFxUSB20DeviceDscr
+C:\Users\liuxin\AppData\Local\Temp\ccVZiiIp.s:67     .rodata:00000040 CyFxUSBBOSDscr
+C:\Users\liuxin\AppData\Local\Temp\ccVZiiIp.s:94     .rodata:00000060 CyFxUSBDeviceQualDscr
+C:\Users\liuxin\AppData\Local\Temp\ccVZiiIp.s:109    .rodata:00000080 CyFxUSBSSConfigDscr
+C:\Users\liuxin\AppData\Local\Temp\ccVZiiIp.s:158    .rodata:000000c0 CyFxUSBHSConfigDscr
+C:\Users\liuxin\AppData\Local\Temp\ccVZiiIp.s:202    .rodata:00000100 CyFxUSBFSConfigDscr
+C:\Users\liuxin\AppData\Local\Temp\ccVZiiIp.s:246    .rodata:00000140 CyFxUSBStringLangIDDscr
+C:\Users\liuxin\AppData\Local\Temp\ccVZiiIp.s:255    .rodata:00000160 CyFxUSBManufactureDscr
+C:\Users\liuxin\AppData\Local\Temp\ccVZiiIp.s:276    .rodata:00000180 CyFxUSBProductDscr
                             *COM*:00000020 CyFxUsbDscrAlignBuffer
 
 NO UNDEFINED SYMBOLS

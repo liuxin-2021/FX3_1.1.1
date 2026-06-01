@@ -90,9 +90,12 @@ typedef enum CyFxDeviceReadyState_e {
 
 static volatile CyFxDeviceReadyState_t glDeviceReadyState = CY_FX_DEVICE_READY_NOT_READY;
 
+static void CyFxAr0234WritePairAndCommit (uint16_t regAddr, uint16_t regData);
 static CyBool_t CyFxApplyBinningMode (uint8_t mode);
 static CyBool_t CyFxVerifyBinningModeReadback (uint8_t mode);
 static CyBool_t CyFxVerifyOffsetReadback (void);
+static CyBool_t CyFxVerifyGainReadback (void);
+static CyBool_t CyFxVerifyExposureReadback (void);
 static void CyFxUpdateDeviceReadyState (CyFxDeviceReadyState_t newState);
 static void CyFxScheduleSelfInit (void);
 static void CyFxRunSelfInit (void);
@@ -736,9 +739,10 @@ void CyFxDeviceInit (uint16_t wValue, uint16_t wIndex, CyBool_t powerCycleFpga)
 		// 普通C2初始化路径不做固定长等待，避免额外阻塞。
 		CyU3PThreadSleep (20);
 	}
-	CyFxSpiProtoWrite8 (0x01, 0x0B, 0x01);   // open led2 send command，蓝灯亮；
+	CyFxSpiProtoWrite8 (0x01, 0x0B, 0x01);   // open led2 send command，蓝灯亮；0
 	glIsDeviceRun = CyFalse;
 	glIsCapMode   = CyTrue;    //标定模式or扫描模式与这个全局变量相关；
+	CyU3PThreadSleep(1500);
 	CyFxUpdateDeviceReadyState (CY_FX_DEVICE_READY_READY);
 	glInResume = CyFalse;
 }
@@ -1257,6 +1261,9 @@ CyU3PReturnStatus_t CyFxGetFPGAVersion(uint8_t *data, uint16_t length)
 		goto cleanup;
 	}
 
+	CyU3PDebugPrint (4, "FPGA raw ver dec: %d %d %d\n",
+	    (int)highValue, (int)midValue, (int)lowValue);
+
 	for (i = 0u; (i < (sizeof(versionPrefix) - 1u)) && (offset + 1u < length); ++i)
 	{
 		data[offset++] = (uint8_t)versionPrefix[i];
@@ -1524,10 +1531,6 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
 	                {
 	                	CyU3PDebugPrint (4, "FPGA version read failed: %d\n", (int)status);
 	                }
-					CyU3PDebugPrint (4, "FPGA ver[0-3]: %d %d %d %d\n",
-					    glFpgaVersion[0], glFpgaVersion[1], glFpgaVersion[2], glFpgaVersion[3]);
-					CyU3PDebugPrint (4, "FPGA ver[4-7]: %d %d %d %d\n",
-					    glFpgaVersion[4], glFpgaVersion[5], glFpgaVersion[6], glFpgaVersion[7]);
                 	CyU3PUsbSendEP0Data (16, glFpgaVersion);
 					break;
 
@@ -1607,7 +1610,7 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
                     //根据扫描头安装与否向上位机传输FX3运行的状态；
                     
                 	
-					if (glsaomswitchState == 0)
+					if (glsaomswitchState == 1)
 					{
 						glEp0Buffer[0] |= 0x04;
 					}
@@ -1676,7 +1679,7 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
 				   break;
 
 
-                case CY_FX_RQT_GAIN:
+				case CY_FX_RQT_GAIN:
 					CyU3PMemSet (glEp0Buffer, 0, sizeof (glEp0Buffer));
 
 
@@ -1708,7 +1711,7 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
 					CyU3PUsbSendEP0Data (1, glEp0Buffer);
 				   break;
 
-                case CY_FX_RQT_EXPO:
+				case CY_FX_RQT_EXPO:
 					CyU3PMemSet (glEp0Buffer, 0, sizeof (glEp0Buffer));
 					glEp0Buffer[0] = (uint8_t)(AR0234ContextConfig.laserExposureSensor1);
 					glEp0Buffer[1] = (uint8_t)(AR0234ContextConfig.laserExposureSensor1>>8);
@@ -1771,9 +1774,9 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
 
 	                CyFxReadTouchSwitchFiltered(&TouchSWitch1, &TouchSwitch2);
 	                //上传触碰开关状态，具体含义见通信协议文档表二，触碰开关正常没有按下时电平是高，扫描头安上后电平是低
-	                if(glsaomswitchState == 0)
+	                if(glsaomswitchState == 1)
 	                {
-	                	statusDeviceRaw = 0x11; //小扫描头安装
+	                	statusDeviceRaw = 0x10; //小扫描头安装
 	                }
 	                else
 	                {
@@ -1971,16 +1974,17 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
     				CyU3PThreadSleep (1000);                     
                 	AR0234_Write_Sensor2(0x3012,AR0234ContextConfig.laserExposureSensor2);
                 	AR0234_Write_Sensor1(0x3012,AR0234ContextConfig.laserExposureSensor1);
+
 					CyFxSpiProtoWrite8 (0x01, 0x81, 0x11);
-					CyU3PThreadSleep (2); /* wait for FPGA I2C proxy to complete */
 					CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
 
                 	AR0234_Write_Sensor2(0x3016,AR0234ContextConfig.whiteLightExposureSensor2);
                 	AR0234_Write_Sensor1(0x3016,AR0234ContextConfig.whiteLightExposureSensor1);
 					CyFxSpiProtoWrite8 (0x01, 0x81, 0x11);
-					CyU3PThreadSleep (2); /* wait for FPGA I2C proxy to complete */
 					CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
-
+					CyU3PDebugPrint (4, "shanweiji, laser=%d white=%d\n",
+	                			AR0234ContextConfig.laserExposureSensor1,
+	                		    AR0234ContextConfig.whiteLightExposureSensor1);
     				CyFxButtonPressed_Start();
                 	CyU3PUsbAckSetup ();
                 	break;
@@ -2083,45 +2087,125 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
 					break;
                 
                 //设置增益d5
-                case CY_FX_RQT_COMMAND_SETGAIN:
+				case CY_FX_RQT_COMMAND_SETGAIN:
+				{
+	                uint16_t combinedGainValue;
 
-                	AR0234ContextConfig.laserGainSensor2 = (uint16_t)(wValue);
-                	//增益白光修改为高8位, by zlq 20250620
-                	AR0234ContextConfig.whiteLightGainSensor2 = (uint16_t)(wIndex);
-                	AR0234ContextConfig.laserGainSensor1 = (uint16_t)(wValue);
-                	//增益白光修改为高8位, by zlq 20250620
-                	AR0234ContextConfig.whiteLightGainSensor1 = (uint16_t)(wIndex);
+	                AR0234ContextConfig.laserGainSensor2 = (uint16_t)(wValue);
+	                //增益白光修改为高8位, by zlq 20250620
+	                AR0234ContextConfig.whiteLightGainSensor2 = (uint16_t)(wIndex);
+	                AR0234ContextConfig.laserGainSensor1 = (uint16_t)(wValue);
+	                //增益白光修改为高8位, by zlq 20250620
+	                AR0234ContextConfig.whiteLightGainSensor1 = (uint16_t)(wIndex);
 
-                	CyU3PDebugPrint (4, "laser_gain_value = %d\n",wValue);
-                	CyU3PDebugPrint (4, "laser_white_value = %d\n",wIndex);
+	                CyU3PDebugPrint (4, "laser_gain_value = %d\n",wValue);
+	                CyU3PDebugPrint (4, "laser_white_value = %d\n",wIndex);
 
 
-                	//修改地址305E为3060，原来激光的值存储在3060地址的低8位, 白光存储在3060地址的高8位, by zlq 20250620
-                	uint16_t laser_gain_value = (wValue & 0xFFFF) | ((wIndex << 8) & 0xFFFF);
-                	AR0234_Write_Sensor2(0x3060,laser_gain_value);
-                	AR0234_Write_Sensor1(0x3060,laser_gain_value);
-					CyFxSpiProtoWrite8 (0x01, 0x81, 0x11);
-					CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
+	                //修改地址305E为3060，原来激光的值存储在3060地址的低8位, 白光存储在3060地址的高8位, by zlq 20250620
+	                combinedGainValue = (uint16_t)((wValue & 0x00FFu) | ((wIndex & 0x00FFu) << 8));
+	                CyFxAr0234WritePairAndCommit (0x3060, combinedGainValue);
+	                if (CyFxVerifyGainReadback () == CyFalse)
+	                {
+	                	CyU3PDebugPrint (4, "GAIN request failed (readback mismatch).\n");
+	                	CyU3PUsbStall (0, CyTrue, CyFalse);
+	                	break;
+	                }
+
+	                CyU3PDebugPrint (4, "GAIN request successful, laser=%d white=%d\n",
+	                			(unsigned int)AR0234ContextConfig.laserGainSensor1,
+	                			(unsigned int)AR0234ContextConfig.whiteLightGainSensor1);
 					CyU3PUsbAckSetup ();
 					break;
-                
-				 //设置曝光d6
-                case CY_FX_RQT_COMMAND_EXPOSURE:
+				}
+                //读取曝光参数
+				case REPORT_EXPOSURE:
+				{
+						uint16_t lasersensor1Data = CyFxGetSensor1param (0x3012);
+	                    uint16_t whitesensor1Data = CyFxGetSensor1param (0x3016);
+						uint16_t lasersensor2Data = CyFxGetSensor2param (0x3012);
+	                    uint16_t whitesensor2Data = CyFxGetSensor2param (0x3016);
+						CyU3PMemSet (glEp0Buffer, 0, sizeof (glEp0Buffer));
+						glEp0Buffer[0] = (uint8_t)(lasersensor1Data & 0x00FFu);
+						glEp0Buffer[1] = (uint8_t)((lasersensor1Data >> 8) & 0x00FFu);
+						glEp0Buffer[2] = (uint8_t)(whitesensor1Data & 0x00FFu);
+						glEp0Buffer[3] = (uint8_t)((whitesensor1Data >> 8) & 0x00FFu);
+						glEp0Buffer[4] = (uint8_t)(lasersensor2Data & 0x00FFu);
+                        glEp0Buffer[5] = (uint8_t)((lasersensor2Data >> 8) & 0x00FFu);
+						glEp0Buffer[6] = (uint8_t)(whitesensor2Data & 0x00FFu);
+						glEp0Buffer[7] = (uint8_t)((whitesensor2Data >> 8) & 0x00FFu);
 
-                	AR0234ContextConfig.laserExposureSensor2 = (uint16_t)(wValue);
-                	AR0234ContextConfig.whiteLightExposureSensor2 = (uint16_t)(wIndex);
-                	AR0234ContextConfig.laserExposureSensor1 = (uint16_t)(wValue);
-                	AR0234ContextConfig.whiteLightExposureSensor1 = (uint16_t)(wIndex);
-                	AR0234_Write_Sensor2(0x3012,AR0234ContextConfig.laserExposureSensor2);
-                	AR0234_Write_Sensor1(0x3012,AR0234ContextConfig.laserExposureSensor1);
-					CyFxSpiProtoWrite8 (0x01, 0x81, 0x11);
-					CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
-                	AR0234_Write_Sensor2(0x3016,AR0234ContextConfig.whiteLightExposureSensor2);
-                	AR0234_Write_Sensor1(0x3016,AR0234ContextConfig.whiteLightExposureSensor1);
-					CyFxSpiProtoWrite8 (0x01, 0x81, 0x11);
-					CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
+						CyU3PDebugPrint(4, "Readback EXPOSURE, sensor1=%d sensor2=%d\n", lasersensor1Data, whitesensor1Data);
+						CyU3PUsbSendEP0Data (8, glEp0Buffer);
+						break;
+				}
+				//读取增益参数
+				case REPORT_GAIN:
+				{
+						uint16_t sensor1Data = CyFxGetSensor1param (0x3060);
+	                    uint16_t sensor2Data = CyFxGetSensor2param (0x3060);
+						CyU3PMemSet (glEp0Buffer, 0, sizeof (glEp0Buffer));
+						glEp0Buffer[0] = (uint8_t)(sensor1Data & 0x00FFu);
+						glEp0Buffer[1] = (uint8_t)((sensor1Data >> 8) & 0x00FFu);
+						glEp0Buffer[2] = (uint8_t)(sensor2Data & 0x00FFu);
+						glEp0Buffer[3] = (uint8_t)((sensor2Data >> 8) & 0x00FFu);
+						CyU3PDebugPrint(4, "Readback GAIN, sensor1=%d sensor2=%d\n", sensor1Data, sensor2Data);
+						CyU3PUsbSendEP0Data (4, glEp0Buffer);
+						break;
+				}
+				//读取偏移量参数
+				case REPORT_OFFSET:
+				{
+						uint16_t sensor1_y_start = CyFxGetSensor1param (0x3002);
+	                    uint16_t sensor1_x_start = CyFxGetSensor1param (0x3004);
+						uint16_t sensor1_y_end = CyFxGetSensor1param (0x3006);
+	                    uint16_t sensor1_x_end = CyFxGetSensor1param (0x3008);
+						uint16_t sensor2_y_start = CyFxGetSensor2param (0x3002);
+	                    uint16_t sensor2_x_start = CyFxGetSensor2param (0x3004);
+						uint16_t sensor2_y_end = CyFxGetSensor2param (0x3006);
+	                    uint16_t sensor2_x_end = CyFxGetSensor2param (0x3008);
+						CyU3PMemSet (glEp0Buffer, 0, sizeof (glEp0Buffer));
+						glEp0Buffer[0] = (uint8_t)(sensor1_y_start & 0x00FFu);
+						glEp0Buffer[1] = (uint8_t)((sensor1_y_start >> 8) & 0x00FFu);
+						glEp0Buffer[2] = (uint8_t)(sensor1_x_start & 0x00FFu);
+						glEp0Buffer[3] = (uint8_t)((sensor1_x_start >> 8) & 0x00FFu);
+						glEp0Buffer[4] = (uint8_t)(sensor1_y_end & 0x00FFu);
+						glEp0Buffer[5] = (uint8_t)((sensor1_y_end >> 8) & 0x00FFu);
+						glEp0Buffer[6] = (uint8_t)(sensor1_x_end & 0x00FFu);
+						glEp0Buffer[7] = (uint8_t)((sensor1_x_end >> 8) & 0x00FFu);
+						glEp0Buffer[8] = (uint8_t)(sensor2_y_start & 0x00FFu);
+						glEp0Buffer[9] = (uint8_t)((sensor2_y_start >> 8) & 0x00FFu);
+						glEp0Buffer[10] = (uint8_t)(sensor2_x_start & 0x00FFu);
+						glEp0Buffer[11] = (uint8_t)((sensor2_x_start >> 8) & 0x00FFu);
+						glEp0Buffer[12] = (uint8_t)(sensor2_y_end & 0x00FFu);
+						glEp0Buffer[13] = (uint8_t)((sensor2_y_end >> 8) & 0x00FFu);
+						glEp0Buffer[14] = (uint8_t)(sensor2_x_end & 0x00FFu);
+						glEp0Buffer[15] = (uint8_t)((sensor2_x_end >> 8) & 0x00FFu);
+						CyU3PUsbSendEP0Data (16, glEp0Buffer);
+						break;
+				}
+				//设置曝光d6
+				case CY_FX_RQT_COMMAND_EXPOSURE:
+				{
+	                AR0234ContextConfig.laserExposureSensor2 = (uint16_t)(wValue);
+	                AR0234ContextConfig.whiteLightExposureSensor2 = (uint16_t)(wIndex);
+	                AR0234ContextConfig.laserExposureSensor1 = (uint16_t)(wValue);
+	                AR0234ContextConfig.whiteLightExposureSensor1 = (uint16_t)(wIndex);
+					CyFxAr0234WritePairAndCommit (0x3012, AR0234ContextConfig.laserExposureSensor1);
+	                CyFxAr0234WritePairAndCommit (0x3016, AR0234ContextConfig.whiteLightExposureSensor1);
+	                if (CyFxVerifyExposureReadback () == CyFalse)
+	                {
+	                	CyU3PDebugPrint (4, "EXPOSURE request failed (readback mismatch).\n");
+	                	CyU3PUsbStall (0, CyTrue, CyFalse);
+	                	break;
+	                }
+
+	                CyU3PDebugPrint (4, "EXPOSURE request successful, laser=%d white=%d\n",
+	                			AR0234ContextConfig.laserExposureSensor1,
+	                			AR0234ContextConfig.whiteLightExposureSensor1);
 					CyU3PUsbAckSetup ();
 					break;
+				}
                 
                 case 0xc7:
 
@@ -2979,7 +3063,7 @@ CyFxVerifyBinningModeReadback (uint8_t mode)
 }
 
 static CyBool_t
-CyFxVerifyOffsetRegPair (uint16_t regAddr, uint16_t expectedSensor1Data, uint16_t expectedSensor2Data)
+CyFxVerifySensorRegPair (uint16_t regAddr, uint16_t expectedSensor1Data, uint16_t expectedSensor2Data)
 {
 	uint16_t sensor1Data = CyFxGetSensor1param (regAddr);
 	uint16_t sensor2Data = CyFxGetSensor2param (regAddr);
@@ -2997,7 +3081,7 @@ CyFxVerifyOffsetRegPair (uint16_t regAddr, uint16_t expectedSensor1Data, uint16_
 	}
 
 	CyU3PDebugPrint (4,
-			"OFFSET verify fail: reg=%d exp1=%d exp2=%d s1=%d s2=%d\n",
+			"READBACK verify fail: reg=%d exp1=%d exp2=%d s1=%d s2=%d\n",
 			(unsigned int)regAddr,
 			(unsigned int)expectedSensor1Data,
 			(unsigned int)expectedSensor2Data,
@@ -3012,30 +3096,37 @@ CyFxVerifyOffsetReadback (void)
 {
 	CyBool_t allPassed = CyTrue;
 
-	if (CyFxVerifyOffsetRegPair (0x3002,
+	if (CyFxVerifySensorRegPair (0x3002,
 			AR0234ContextConfig.laserOffsetSensor1_y_start,
 			AR0234ContextConfig.laserOffsetSensor2_y_start) == CyFalse) { allPassed = CyFalse; }
-	if (CyFxVerifyOffsetRegPair (0x308C,
-			AR0234ContextConfig.whiteOffsetSensor1_y_start,
-			AR0234ContextConfig.whiteOffsetSensor2_y_start) == CyFalse) { allPassed = CyFalse; }
-	if (CyFxVerifyOffsetRegPair (0x3004,
-			AR0234ContextConfig.laserOffsetSensor1_x_start,
-			AR0234ContextConfig.laserOffsetSensor2_x_start) == CyFalse) { allPassed = CyFalse; }
-	if (CyFxVerifyOffsetRegPair (0x308A,
-			AR0234ContextConfig.whiteOffsetSensor1_x_start,
-			AR0234ContextConfig.whiteOffsetSensor2_x_start) == CyFalse) { allPassed = CyFalse; }
-	if (CyFxVerifyOffsetRegPair (0x3006,
-			AR0234ContextConfig.laserOffsetSensor1_y_end,
-			AR0234ContextConfig.laserOffsetSensor2_y_end) == CyFalse) { allPassed = CyFalse; }
-	if (CyFxVerifyOffsetRegPair (0x3090,
-			AR0234ContextConfig.whiteOffsetSensor1_y_end,
-			AR0234ContextConfig.whiteOffsetSensor2_y_end) == CyFalse) { allPassed = CyFalse; }
-	if (CyFxVerifyOffsetRegPair (0x3008,
+	if (CyFxVerifySensorRegPair (0x3008,
 			AR0234ContextConfig.laserOffsetSensor1_x_end,
 			AR0234ContextConfig.laserOffsetSensor2_x_end) == CyFalse) { allPassed = CyFalse; }
-	if (CyFxVerifyOffsetRegPair (0x308E,
-			AR0234ContextConfig.whiteOffsetSensor1_x_end,
-			AR0234ContextConfig.whiteOffsetSensor2_x_end) == CyFalse) { allPassed = CyFalse; }
+	return allPassed;
+}
+
+static CyBool_t
+CyFxVerifyGainReadback (void)
+{
+	uint16_t expectedSensor1Gain = (uint16_t)((AR0234ContextConfig.laserGainSensor1 & 0x00FFu) |
+			((AR0234ContextConfig.whiteLightGainSensor1 & 0x00FFu) << 8));
+	uint16_t expectedSensor2Gain = (uint16_t)((AR0234ContextConfig.laserGainSensor2 & 0x00FFu) |
+			((AR0234ContextConfig.whiteLightGainSensor2 & 0x00FFu) << 8));
+
+	return CyFxVerifySensorRegPair (0x3060, expectedSensor1Gain, expectedSensor2Gain);
+}
+
+static CyBool_t
+CyFxVerifyExposureReadback (void)
+{
+	CyBool_t allPassed = CyTrue;
+
+	if (CyFxVerifySensorRegPair (0x3012,
+			AR0234ContextConfig.laserExposureSensor1,
+			AR0234ContextConfig.laserExposureSensor2) == CyFalse) { allPassed = CyFalse; }
+	if (CyFxVerifySensorRegPair (0x3016,
+			AR0234ContextConfig.whiteLightExposureSensor1,
+			AR0234ContextConfig.whiteLightExposureSensor2) == CyFalse) { allPassed = CyFalse; }
 
 	return allPassed;
 }

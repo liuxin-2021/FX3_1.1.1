@@ -17,7 +17,11 @@ ar0234.d: ../ar0234.c ../ar0234.h \
  C:\Program\ Files\ (x86)\Cypress\EZ-USB\ FX3\ SDK\1.3\firmware\u3p_firmware\inc/cyu3usbconst.h \
  C:\Program\ Files\ (x86)\Cypress\EZ-USB\ FX3\ SDK\1.3\firmware\u3p_firmware\inc/cyu3externcend.h \
  ../cyfxslfifosync.h \
- C:\Program\ Files\ (x86)\Cypress\EZ-USB\ FX3\ SDK\1.3\firmware\u3p_firmware\inc/cyu3error.h
+ C:\Program\ Files\ (x86)\Cypress\EZ-USB\ FX3\ SDK\1.3\firmware\u3p_firmware\inc/cyu3error.h \
+ ../standalone_spi/cyfx_gpio_spi_standalone.h \
+ C:\Program\ Files\ (x86)\Cypress\EZ-USB\ FX3\ SDK\1.3\firmware\u3p_firmware\inc/cyu3gpio.h \
+ C:\Program\ Files\ (x86)\Cypress\EZ-USB\ FX3\ SDK\1.3\firmware\u3p_firmware\inc/cyu3system.h \
+ C:\Program\ Files\ (x86)\Cypress\EZ-USB\ FX3\ SDK\1.3\firmware\u3p_firmware\inc/cyu3lpp.h
 
 ../ar0234.h:
 
@@ -58,3 +62,11 @@ C:\Program\ Files\ (x86)\Cypress\EZ-USB\ FX3\ SDK\1.3\firmware\u3p_firmware\inc/
 ../cyfxslfifosync.h:
 
 C:\Program\ Files\ (x86)\Cypress\EZ-USB\ FX3\ SDK\1.3\firmware\u3p_firmware\inc/cyu3error.h:
+
+../standalone_spi/cyfx_gpio_spi_standalone.h:
+
+C:\Program\ Files\ (x86)\Cypress\EZ-USB\ FX3\ SDK\1.3\firmware\u3p_firmware\inc/cyu3gpio.h:
+
+C:\Program\ Files\ (x86)\Cypress\EZ-USB\ FX3\ SDK\1.3\firmware\u3p_firmware\inc/cyu3system.h:
+
+C:\Program\ Files\ (x86)\Cypress\EZ-USB\ FX3\ SDK\1.3\firmware\u3p_firmware\inc/cyu3lpp.h:
