@@ -99,6 +99,8 @@ static CyBool_t CyFxVerifyExposureReadback (void);
 static void CyFxUpdateDeviceReadyState (CyFxDeviceReadyState_t newState);
 static void CyFxScheduleSelfInit (void);
 static void CyFxRunSelfInit (void);
+static void CyFxWaitForAr0234InitReady (void);
+CyU3PReturnStatus_t CyFxGetFPGAVersion (uint8_t *data, uint16_t length);
 void CyFxDeviceInit (uint16_t wValue, uint16_t wIndex, CyBool_t powerCycleFpga);
 
 /* Simplified state management - direct access for better performance and less memory */
@@ -224,6 +226,49 @@ CyFxReadTouchSwitchFiltered (CyBool_t *touch1, CyBool_t *touch2)
 
 	*touch1 = (key1High > key1Low) ? CyTrue : CyFalse;
 	*touch2 = (key2High > key2Low) ? CyTrue : CyFalse;
+}
+
+static void
+CyFxWaitForAr0234InitReady (void)
+{
+	const uint16_t yStart = 0u;
+	const uint16_t xStart = 0u;
+	const uint16_t yEnd = 999u;
+	const uint16_t xEnd = 1299u;
+	uint16_t s1yStart = 0u;
+	uint16_t s2yStart = 0u;
+	uint16_t s1xStart = 0u;
+	uint16_t s2xStart = 0u;
+	uint16_t s1yEnd = 0u;
+	uint16_t s2yEnd = 0u;
+	uint16_t s1xEnd = 0u;
+	uint16_t s2xEnd = 0u;
+
+	/* Block here until FPGA version can be read, then offset write+readback succeeds. */
+	for (;;)
+	{
+		CyFxAr0234WritePairAndCommit (0x3002, yStart);
+		CyFxAr0234WritePairAndCommit (0x3004, xStart);
+		CyFxAr0234WritePairAndCommit (0x3006, yEnd);
+		CyFxAr0234WritePairAndCommit (0x3008, xEnd);
+
+		s1yStart = CyFxGetSensor1param (0x3002);
+		s2yStart = CyFxGetSensor2param (0x3002);
+		s1xStart = CyFxGetSensor1param (0x3004);
+		s2xStart = CyFxGetSensor2param (0x3004);
+		s1yEnd = CyFxGetSensor1param (0x3006);
+		s2yEnd = CyFxGetSensor2param (0x3006);
+		s1xEnd = CyFxGetSensor1param (0x3008);
+		s2xEnd = CyFxGetSensor2param (0x3008);
+
+		if ((s1yStart == yStart) && (s2yStart == yStart) &&
+			(s1xStart == xStart) && (s2xStart == xStart) &&
+			(s1yEnd == yEnd) && (s2yEnd == yEnd) &&
+			(s1xEnd == xEnd) && (s2xEnd == xEnd))
+		{
+			break;
+		}
+	}
 }
 
 
@@ -742,7 +787,7 @@ void CyFxDeviceInit (uint16_t wValue, uint16_t wIndex, CyBool_t powerCycleFpga)
 	CyFxSpiProtoWrite8 (0x01, 0x0B, 0x01);   // open led2 send command，蓝灯亮；0
 	glIsDeviceRun = CyFalse;
 	glIsCapMode   = CyTrue;    //标定模式or扫描模式与这个全局变量相关；
-	CyU3PThreadSleep(1500);
+	CyFxWaitForAr0234InitReady ();
 	CyFxUpdateDeviceReadyState (CY_FX_DEVICE_READY_READY);
 	glInResume = CyFalse;
 }
@@ -1516,6 +1561,12 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
     //上位机控制指令处理流程
     if (bType == CY_U3P_USB_VENDOR_RQT)
     {
+			/* 在初始化完成前，统一拒绝所有 Vendor 指令（返回 STALL）。 */
+			if (!CyFxDeviceIsReady ())
+			{
+				return CyFalse;
+			}
+
             isHandled = CyTrue;
 
             switch (bRequest)
@@ -1536,11 +1587,6 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
 
 
                 case CY_FX_RQT_STATUS:
-	                if (!CyFxDeviceIsReady ())
-	                {
-	                	isHandled = CyFalse;
-	                	break;
-	                }
                 	//KeyAddTimes++;
                 	CyU3PMemSet (glEp0Buffer, 0, sizeof (glEp0Buffer));
                 	key1TimesTrue=0;
@@ -1774,9 +1820,9 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
 
 	                CyFxReadTouchSwitchFiltered(&TouchSWitch1, &TouchSwitch2);
 	                //上传触碰开关状态，具体含义见通信协议文档表二，触碰开关正常没有按下时电平是高，扫描头安上后电平是低
-	                if(glsaomswitchState == 1)
+	                if(glsaomswitchState == 0)
 	                {
-	                	statusDeviceRaw = 0x10; //小扫描头安装
+	                	statusDeviceRaw = 0x10; //大扫描头安装
 	                }
 	                else
 	                {
@@ -1795,6 +1841,11 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
 	                	{
 	                		statusDeviceRaw = 0x20;
 	                	}
+						else //触碰开关1和触碰开关2是高电平，没有扫描头安装
+	                	{
+	                		statusDeviceRaw = 0x00;
+	                	}	
+
 	                }
 
 	                glEp0Buffer[0] = statusDeviceRaw;
@@ -1803,17 +1854,9 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
                 }
                 
 				case CY_FX_STATUS_DETECTION:
-				     CyU3PDebugPrint (4, "E0 value=%d\n",wValue);
-				     
-					 if((wValue & 0x01) == 0x01)
-					 {
-						 glsaomswitchState = 1;
-					 }
-					 else if((wValue & 0x01) == 0x00)
-					 {
-						glsaomswitchState = 0;
-						
-					 }
+				    CyU3PDebugPrint (4, "E0 value=%d\n",wValue);
+				    glsaomswitchState = (uint8_t)(wValue);
+					CyU3PDebugPrint (4, "glsaomswitchState value=%d\n",glsaomswitchState);
 					CyU3PUsbAckSetup ();
                     break;
 
@@ -1897,6 +1940,7 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
 					break;
 
 				case CY_FX_WHITE_LIGHT:
+				{
 				    currentData.whiteLightPWM = ((uint32_t)(wValue & 0x00FF)) << 16;
 					currentData.whiteLightPWM += (uint32_t)(wIndex);
 					//打印value值，调试用；
@@ -1907,7 +1951,7 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
 					CyU3PUsbAckSetup ();
 					TemperatureMonitor_Start();
 					break;
-				
+				}
 				case CY_FX_RQT_GYRO_CONTROL:
 				{
 					/* 只处理 OUT 方向（主机写） */
@@ -2896,46 +2940,47 @@ void SlFifoAppThread_Entry (uint32_t input)
 			CyU3PDebugPrint (4, "Step3:Enter Button deal");
             #endif
 
-					 //按键时间计算
-					do{
-						 CyU3PGpioGetValue(BUTTON, &gpioValue);
-						 CyU3PThreadSleep(10);                   //恢复原来的10ms延时，保持稳定的时序
-						 press_cnt++;
-						 if(press_cnt > LONG_PRESS_TIME)
-						 {
-							 glPress_Detect = CyFalse;
-							 eventFlag &= (~(0x01<<1));
-							 break;
-						 }
-
-					   }while(gpioValue == CyFalse);
-
-					txApiRetStatus = 1;
-					glPress_Detect = CyFalse;
-					eventFlag &= (~(0x01<<1));//eventFlag的bit1被强制清零？？？
-
-					if(press_cnt < LONG_PRESS_TIME)
+			//按键时间计算
+			do{
+					CyU3PGpioGetValue(BUTTON, &gpioValue);
+					CyU3PThreadSleep(10);                   //恢复原来的10ms延时，保持稳定的时序
+					press_cnt++;
+					if(press_cnt > LONG_PRESS_TIME)
 					{
-						if(press_cnt > 0)
-						{
-							glStatus_Extra &= 0x7f;      // clear long press flag
-							glStatus_Extra |= 0x40;      // 短按标志
-						}
-						if(press_cnt == 0)
-						{
-							glStatus_Extra &= 0x3f;
-						}
+						glPress_Detect = CyFalse;
+						eventFlag &= (~(0x01<<1));
+						break;
+					}
 
-					}
-					else
+				}while(gpioValue == CyFalse);
+
+				txApiRetStatus = 1;
+				glPress_Detect = CyFalse;
+				eventFlag &= (~(0x01<<1));//eventFlag的bit1被强制清零？？？
+
+				if(press_cnt < LONG_PRESS_TIME)
+			    {
+					if(press_cnt > 0)
 					{
-						// 长按必关投影：无条件调用停止流程，避免因状态位不同步导致无效
-						CyFxButtonPressed_Stop();
-						glStatus_Extra &= 0xbf;      // clear short press flag
-						glStatus_Extra |= 0x80;      // set long press flag
-						CyU3PThreadSleep(3000);                   //delay 3000ms
+						glStatus_Extra &= 0x7f;      // clear long press flag
+						glStatus_Extra |= 0x40;      // 短按标志
 					}
-					glPress_Detect = CyTrue;
+					if(press_cnt == 0)
+					{
+						glStatus_Extra &= 0x3f;
+					}
+
+				}
+				else
+				{
+					// 长按必关投影：无条件调用停止流程，避免因状态位不同步导致无效
+					CyFxButtonPressed_Stop();
+					glStatus_Extra &= 0xbf;      // clear short press flag
+					glStatus_Extra |= 0x80;      // set long press flag
+					CyU3PThreadSleep(3000);                   //delay 3000ms
+				}
+				glPress_Detect = CyTrue;
+					
     } //for
 }
 

@@ -8,6 +8,6 @@
 #ifndef VERSION_H_
 #define VERSION_H_
 
-const uint8_t glFX3ID[32]  __attribute__ ((aligned (32))) = { 'F', 'X', '3', '_','2', '_', 'V', '1',  '.', '1', '.', '0', '6', '\0' };
+const uint8_t glFX3ID[32]  __attribute__ ((aligned (32))) = { 'F', 'X', '3', '_','2', '_', 'V', '1',  '.', '1', '.', '0', '9', '\0' };
 
 #endif /* VERSION_H_ */
