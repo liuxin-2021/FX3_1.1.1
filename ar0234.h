@@ -69,6 +69,7 @@ extern void AR0234_Write_Sensor1(uint16_t  regAddr,uint16_t  regData);
 extern void AR0234_Write_Sensor2(uint16_t  regAddr,uint16_t  regData);
 extern uint16_t CyFxGetSensor1param(uint16_t sensoraddr);
 extern uint16_t CyFxGetSensor2param(uint16_t sensoraddr);
+extern void CyFxGetBothSensorParams(uint16_t sensoraddr, uint16_t *sensor1Out, uint16_t *sensor2Out);
 
 extern void AR0234_DumpCoreModeRegisters_Sequential100ms(void);
 

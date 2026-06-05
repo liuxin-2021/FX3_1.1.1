@@ -170,56 +170,55 @@ void AR0234_Write_Sensor2(uint16_t  regAddr,uint16_t  regData)
 //读取第一路传感器寄存器参数
 uint16_t CyFxGetSensor1param(uint16_t sensoraddr)
 {
-	uint8_t  dataHigh = 0;
-	uint8_t  dataLow = 0;
-	uint8_t  registerAddrHigh;
-	uint8_t  registerAddrLow;
-	uint16_t sensorparam = 0;
+	uint16_t sensor1Value = 0;
+	uint16_t sensor2Value = 0;
 
-	registerAddrHigh = (sensoraddr >> 8) & 0xFF;
-	registerAddrLow = sensoraddr & 0xFF;
-	AR0234_TxnLock();
-    CyFxSpiProtoWrite8 (0x01, 0x82, registerAddrHigh);
-	CyFxSpiProtoWrite8 (0x01, 0x83, registerAddrLow);
-	CyFxSpiProtoWrite8 (0x01, 0x81, 0x22);
-	CyFxSpiProtoWrite8 (0x01, 0x81, 0x00); 
-	CyU3PThreadSleep (50);
-	(void)CyFxSpiProtoReadSelectedStatus8 (0x01, &dataHigh);
-	(void)CyFxSpiProtoReadSelectedStatus8 (0x02, &dataLow);
-	(void)CyFxSpiProtoWrite8 (0x02, 0xff, 0x00);
-	AR0234_TxnUnlock();
-
-	sensorparam = (dataHigh<<8)|dataLow;
-
-	return sensorparam;
+	CyFxGetBothSensorParams (sensoraddr, &sensor1Value, &sensor2Value);
+	return sensor1Value;
 }
 
 
 //读取第二路传感器寄存器参数
 uint16_t CyFxGetSensor2param(uint16_t sensoraddr)
 {
-	uint8_t  dataHigh = 0;
-	uint8_t  dataLow = 0;
-	uint8_t  registerAddrHigh;
-	uint8_t  registerAddrLow;	
-	uint16_t sensorparam;
+	uint16_t sensor1Value = 0;
+	uint16_t sensor2Value = 0;
 
-	registerAddrHigh = (sensoraddr >> 8) & 0xFF;
-	registerAddrLow = sensoraddr & 0xFF;
+	CyFxGetBothSensorParams (sensoraddr, &sensor1Value, &sensor2Value);
+	return sensor2Value;
+}
+
+/* 同时读取两路传感器的同一寄存器：先丢弃一次触发结果，再返回第二次实时读。
+ * 第一次触发用于刷新 FPGA 状态寄存器，避免读到上一条 AR0234 事务留下的结果。
+ */
+void CyFxGetBothSensorParams (uint16_t sensoraddr, uint16_t *sensor1Out, uint16_t *sensor2Out)
+{
+	uint8_t  s1High = 0, s1Low = 0;
+	uint8_t  s2High = 0, s2Low = 0;
+	uint8_t  addrHigh = (uint8_t)((sensoraddr >> 8) & 0xFFu);
+	uint8_t  addrLow  = (uint8_t)(sensoraddr & 0xFFu);
+	uint8_t  attempt;
+
 	AR0234_TxnLock();
-    CyFxSpiProtoWrite8 (0x01, 0x92, registerAddrHigh);
-	CyFxSpiProtoWrite8 (0x01, 0x93, registerAddrLow);
-	CyFxSpiProtoWrite8 (0x01, 0x81, 0x22);
-	CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
-	CyU3PThreadSleep (50);
-	(void)CyFxSpiProtoReadSelectedStatus8 (0x03, &dataHigh);
-	(void)CyFxSpiProtoReadSelectedStatus8 (0x04, &dataLow);
+	for (attempt = 0; attempt < 2u; attempt++)
+	{
+		CyFxSpiProtoWrite8 (0x01, 0x82, addrHigh);
+		CyFxSpiProtoWrite8 (0x01, 0x83, addrLow);
+		CyFxSpiProtoWrite8 (0x01, 0x92, addrHigh);
+		CyFxSpiProtoWrite8 (0x01, 0x93, addrLow);
+		CyFxSpiProtoWrite8 (0x01, 0x81, 0x22);
+		CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
+		CyU3PThreadSleep (50);
+		(void)CyFxSpiProtoReadSelectedStatus8 (0x01, &s1High);
+		(void)CyFxSpiProtoReadSelectedStatus8 (0x02, &s1Low);
+		(void)CyFxSpiProtoReadSelectedStatus8 (0x03, &s2High);
+		(void)CyFxSpiProtoReadSelectedStatus8 (0x04, &s2Low);
+	}
 	(void)CyFxSpiProtoWrite8 (0x02, 0xff, 0x00);
 	AR0234_TxnUnlock();
 
-	sensorparam = (dataHigh<<8)|dataLow;
-
-	return sensorparam;
+	if (sensor1Out != 0) { *sensor1Out = (uint16_t)((s1High << 8) | s1Low); }
+	if (sensor2Out != 0) { *sensor2Out = (uint16_t)((s2High << 8) | s2Low); }
 }
 
 /**
@@ -245,17 +244,27 @@ void TemperatureSensor_Enable(void)
  */
 void TemperatureSensor_ReadCalibration(uint16_t *pCalibSensor1, uint16_t *pCalibSensor2)
 {
-	// 只取低10位 [9:0]
-    if (pCalibSensor1 != NULL)
+	uint16_t calibSensor1 = 0;
+	uint16_t calibSensor2 = 0;
+
+	if ((pCalibSensor1 == NULL) && (pCalibSensor2 == NULL))
 	{
-		*pCalibSensor1 = CyFxGetSensor1param(0x30C6) & 0x03FF;
+		return;
+	}
+
+	CyFxGetBothSensorParams (0x30C6, &calibSensor1, &calibSensor2);
+
+	// 只取低10位 [9:0]
+	if (pCalibSensor1 != NULL)
+	{
+		*pCalibSensor1 = calibSensor1 & 0x03FF;
 		#ifdef AR0234_DIAG_DEBUG
 		CyU3PDebugPrint(4, "TEMP calib-s1=%d\n", *pCalibSensor1);
 		#endif
 	}
 	if (pCalibSensor2 != NULL)
 	{
-		*pCalibSensor2 = CyFxGetSensor2param(0x30C6) & 0x03FF;
+		*pCalibSensor2 = calibSensor2 & 0x03FF;
 		#ifdef AR0234_DIAG_DEBUG
 		CyU3PDebugPrint(4, "TEMP calib-s2=%d\n", *pCalibSensor2);
 		#endif
@@ -271,17 +280,27 @@ void TemperatureSensor_ReadCalibration(uint16_t *pCalibSensor1, uint16_t *pCalib
  */
 void TemperatureSensor_ReadRawValue(uint16_t *pTempSensor1, uint16_t *pTempSensor2)
 {
-	// 只取低10位 [9:0]
-    if (pTempSensor1 != NULL)
+	uint16_t rawSensor1 = 0;
+	uint16_t rawSensor2 = 0;
+
+	if ((pTempSensor1 == NULL) && (pTempSensor2 == NULL))
 	{
-		*pTempSensor1 = CyFxGetSensor1param(0x30B2) & 0x03FF;
+		return;
+	}
+
+	CyFxGetBothSensorParams (0x30B2, &rawSensor1, &rawSensor2);
+
+	// 只取低10位 [9:0]
+	if (pTempSensor1 != NULL)
+	{
+		*pTempSensor1 = rawSensor1 & 0x03FF;
 		#ifdef AR0234_DIAG_DEBUG
 		CyU3PDebugPrint(4, "TEMP raw-s1=%d\n", *pTempSensor1);
 		#endif
 	}
 	if (pTempSensor2 != NULL)
 	{
-		*pTempSensor2 = CyFxGetSensor2param(0x30B2) & 0x03FF;
+		*pTempSensor2 = rawSensor2 & 0x03FF;
 		#ifdef AR0234_DIAG_DEBUG
 		CyU3PDebugPrint(4, "TEMP raw-s2=%d\n", *pTempSensor2);
 		#endif
@@ -450,14 +469,14 @@ void AR0234_DumpCoreModeRegisters_Sequential100ms(void)
 {
 	uint16_t s1, s2;
 	/* 0x30B0 */
-	s1 = CyFxGetSensor1param(0x30B0); s2 = CyFxGetSensor2param(0x30B0);
+	CyFxGetBothSensorParams(0x30B0, &s1, &s2);
 	#ifdef AR0234_DIAG_DEBUG
 	CyU3PDebugPrint(4, "REG read reg=0x30B0 s1=%d\n", s1);
 	CyU3PDebugPrint(4, "REG read reg=0x30B0 s2=%d\n", s2);
 	#endif
 	CyU3PThreadSleep(100);
 	/* 0x30A2 */
-	s1 = CyFxGetSensor1param(0x30A2); s2 = CyFxGetSensor2param(0x30A2);
+	CyFxGetBothSensorParams(0x30A2, &s1, &s2);
 	#ifdef AR0234_DIAG_DEBUG
 	CyU3PDebugPrint(4, "REG read reg=0x30A2 s1=%d\n", s1);
 	CyU3PDebugPrint(4, "REG read reg=0x30A2 s2=%d\n", s2);
@@ -465,7 +484,7 @@ void AR0234_DumpCoreModeRegisters_Sequential100ms(void)
 	CyU3PThreadSleep(100);
 
 	/* 0x30A6 */
-	s1 = CyFxGetSensor1param(0x30A6); s2 = CyFxGetSensor2param(0x30A6);
+	CyFxGetBothSensorParams(0x30A6, &s1, &s2);
 	#ifdef AR0234_DIAG_DEBUG
 	CyU3PDebugPrint(4, "REG read reg=0x30A6 s1=%d\n", s1);
 	CyU3PDebugPrint(4, "REG read reg=0x30A6 s2=%d\n", s2);
@@ -473,7 +492,7 @@ void AR0234_DumpCoreModeRegisters_Sequential100ms(void)
 	CyU3PThreadSleep(100);
 
 	/* 0x3040 */
-	s1 = CyFxGetSensor1param(0x3040); s2 = CyFxGetSensor2param(0x3040);
+	CyFxGetBothSensorParams(0x3040, &s1, &s2);
 	#ifdef AR0234_DIAG_DEBUG
 	CyU3PDebugPrint(4, "REG read reg=0x3040 s1=%d\n", s1);
 	CyU3PDebugPrint(4, "REG read reg=0x3040 s2=%d\n", s2);
@@ -481,7 +500,7 @@ void AR0234_DumpCoreModeRegisters_Sequential100ms(void)
 	CyU3PThreadSleep(100);
 
 	/* 0x30AE */
-	s1 = CyFxGetSensor1param(0x30AE); s2 = CyFxGetSensor2param(0x30AE);
+	CyFxGetBothSensorParams(0x30AE, &s1, &s2);
 	#ifdef AR0234_DIAG_DEBUG
 	CyU3PDebugPrint(4, "REG read reg=0x30AE s1=%d\n", s1);
 	CyU3PDebugPrint(4, "REG read reg=0x30AE s2=%d\n", s2);
@@ -489,7 +508,7 @@ void AR0234_DumpCoreModeRegisters_Sequential100ms(void)
 	CyU3PThreadSleep(100);
 
 	/* 0x30A8 */
-	s1 = CyFxGetSensor1param(0x30A8); s2 = CyFxGetSensor2param(0x30A8);
+	CyFxGetBothSensorParams(0x30A8, &s1, &s2);
 	#ifdef AR0234_DIAG_DEBUG
 	CyU3PDebugPrint(4, "REG read reg=0x30A8 s1=%d\n", s1);
 	CyU3PDebugPrint(4, "REG read reg=0x30A8 s2=%d\n", s2);

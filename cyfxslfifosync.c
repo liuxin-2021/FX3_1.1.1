@@ -276,14 +276,10 @@ CyFxWaitForAr0234InitReady (void)
 		CyFxAr0234WritePairAndCommit (0x3006, yEnd);
 		CyFxAr0234WritePairAndCommit (0x3008, xEnd);
 
-		s1yStart = CyFxGetSensor1param (0x3002);
-		s2yStart = CyFxGetSensor2param (0x3002);
-		s1xStart = CyFxGetSensor1param (0x3004);
-		s2xStart = CyFxGetSensor2param (0x3004);
-		s1yEnd = CyFxGetSensor1param (0x3006);
-		s2yEnd = CyFxGetSensor2param (0x3006);
-		s1xEnd = CyFxGetSensor1param (0x3008);
-		s2xEnd = CyFxGetSensor2param (0x3008);
+		CyFxGetBothSensorParams (0x3002, &s1yStart, &s2yStart);
+		CyFxGetBothSensorParams (0x3004, &s1xStart, &s2xStart);
+		CyFxGetBothSensorParams (0x3006, &s1yEnd, &s2yEnd);
+		CyFxGetBothSensorParams (0x3008, &s1xEnd, &s2xEnd);
 
 		if ((s1yStart == yStart) && (s2yStart == yStart) &&
 			(s1xStart == xStart) && (s2xStart == xStart) &&
@@ -1675,39 +1671,35 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
 	                }
 	                glEp0Buffer[1] = glStatus_Extra;//把短按还是长按标识赋值
 	                glStatus_Extra &= 0x3f;  //clear long & short press flag
-    
-                    //根据扫描头安装与否向上位机传输FX3运行的状态；
-                    
-                	
-					if (glsaomswitchState == 1)
+					 //上传触碰开关状态，具体含义见通信协议文档，触碰开关正常没有按下时电平是高，扫描头安上后电平是低
+					//E0=0时屏蔽扫描头检测，B2固定上报有扫描头，避免无扫描头分支停扫。
+					if(glsaomswitchState == 0)
 					{
 						glEp0Buffer[0] |= 0x04;
-					}
-					else
-					{
-					    //上传触碰开关状态，具体含义见通信协议文档，触碰开关正常没有按下时电平是高，扫描头安上后电平是低
-                	    //触碰开关1是低电平，扫描头1（大扫描头）安装；////////////
-                	    if((TouchSWitch1 == CyFalse) && (TouchSwitch2 == CyTrue))
-                	    {
-                		    glEp0Buffer[0] |= 0x04;
 
-                	    }
-                	    //触碰开关2是低电平，扫描头2（小扫描头）安装；
-                	    else if((TouchSWitch1 == CyTrue) && (TouchSwitch2 == CyFalse))
-                	    {
-                		    glEp0Buffer[0] |= 0x04;
-
-                	    }
-                	    //触碰开关1和触碰开关2是高电平，没有扫描头安装，2025.04.16结构有问题，暂时取消这个功能；
-                	    else if((TouchSWitch1 == CyTrue) && (TouchSwitch2 == CyTrue))
-                	    {
-						    glEp0Buffer[0] &= 0x7b;     //向上位机传输停止扫描状态，即传输第一个字节的最高位bit7是0，bit2是0（无扫描头）；
-						    if ((glIsDeviceRun == CyTrue) && (glInResume == CyFalse))
-						    {
-	                		        CyFxButtonPressed_Stop();
-						    }
-                	    }
 					}
+					//触碰开关1是低电平，扫描头1（大扫描头）安装；////////////
+					else if((TouchSWitch1 == CyFalse) && (TouchSwitch2 == CyTrue))
+                	{
+                		glEp0Buffer[0] |= 0x04;
+
+                	}
+                	 //触碰开关2是低电平，扫描头2（小扫描头）安装；
+                	else if((TouchSWitch1 == CyTrue) && (TouchSwitch2 == CyFalse))
+                	 {
+                		glEp0Buffer[0] |= 0x04;
+
+                	}
+                	//触碰开关1和触碰开关2是高电平，没有扫描头安装，2025.04.16结构有问题，暂时取消这个功能；
+                	else if((TouchSWitch1 == CyTrue) && (TouchSwitch2 == CyTrue))
+                	 {
+						glEp0Buffer[0] &= 0x7b;     //向上位机传输停止扫描状态，即传输第一个字节的最高位bit7是0，bit2是0（无扫描头）；
+						if ((glIsDeviceRun == CyTrue) && (glInResume == CyFalse))
+						{
+	                		CyFxButtonPressed_Stop();
+						}
+                	}
+					
                     //根据磁吸开关状态向上位机传输磁吸开关的状态，并且控制口扫设备的工作状态；
                 	//磁吸开关是高电平，磁吸未被触发，设备处于工作状态，向上位机传输1（第1个字节的bit1位）；
                 	if(SclGpioValue == CyTrue)
@@ -1724,7 +1716,7 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
 						}
                 	}
 
-					
+					CyU3PDebugPrint(4, "glEp0Buffer[0] = %d\n", (int)glEp0Buffer[0]);
                 	CyU3PUsbSendEP0Data (2, glEp0Buffer);
                 	break;
 
@@ -2193,10 +2185,10 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
                 //读取曝光参数
 				case REPORT_EXPOSURE:
 				{
-						uint16_t lasersensor1Data = CyFxGetSensor1param (0x3012);
-	                    uint16_t whitesensor1Data = CyFxGetSensor1param (0x3016);
-						uint16_t lasersensor2Data = CyFxGetSensor2param (0x3012);
-	                    uint16_t whitesensor2Data = CyFxGetSensor2param (0x3016);
+						uint16_t lasersensor1Data, lasersensor2Data;
+						uint16_t whitesensor1Data, whitesensor2Data;
+						CyFxGetBothSensorParams (0x3012, &lasersensor1Data, &lasersensor2Data);
+						CyFxGetBothSensorParams (0x3016, &whitesensor1Data, &whitesensor2Data);
 						CyU3PMemSet (glEp0Buffer, 0, sizeof (glEp0Buffer));
 						glEp0Buffer[0] = (uint8_t)(lasersensor1Data & 0x00FFu);
 						glEp0Buffer[1] = (uint8_t)((lasersensor1Data >> 8) & 0x00FFu);
@@ -2207,35 +2199,38 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
 						glEp0Buffer[6] = (uint8_t)(whitesensor2Data & 0x00FFu);
 						glEp0Buffer[7] = (uint8_t)((whitesensor2Data >> 8) & 0x00FFu);
 
-						CyU3PDebugPrint(4, "Readback EXPOSURE, sensor1=%d sensor2=%d\n", lasersensor1Data, whitesensor1Data);
+						CyU3PDebugPrint (4, "Readback EXPOSURE s1_laser=%d s1_white=%d s2_laser=%d s2_white=%d\n",
+								(unsigned int)lasersensor1Data, (unsigned int)whitesensor1Data,
+								(unsigned int)lasersensor2Data, (unsigned int)whitesensor2Data);
 						CyU3PUsbSendEP0Data (8, glEp0Buffer);
 						break;
 				}
 				//读取增益参数
 				case REPORT_GAIN:
 				{
-						uint16_t sensor1Data = CyFxGetSensor1param (0x3060);
-	                    uint16_t sensor2Data = CyFxGetSensor2param (0x3060);
+						uint16_t sensor1Data, sensor2Data;
+						CyFxGetBothSensorParams (0x3060, &sensor1Data, &sensor2Data);
 						CyU3PMemSet (glEp0Buffer, 0, sizeof (glEp0Buffer));
 						glEp0Buffer[0] = (uint8_t)(sensor1Data & 0x00FFu);
 						glEp0Buffer[1] = (uint8_t)((sensor1Data >> 8) & 0x00FFu);
 						glEp0Buffer[2] = (uint8_t)(sensor2Data & 0x00FFu);
 						glEp0Buffer[3] = (uint8_t)((sensor2Data >> 8) & 0x00FFu);
-						CyU3PDebugPrint(4, "Readback GAIN, sensor1=%d sensor2=%d\n", sensor1Data, sensor2Data);
+						CyU3PDebugPrint (4, "Readback GAIN sensor1=%d sensor2=%d\n",
+								(unsigned int)sensor1Data, (unsigned int)sensor2Data);
 						CyU3PUsbSendEP0Data (4, glEp0Buffer);
 						break;
 				}
 				//读取偏移量参数
 				case REPORT_OFFSET:
 				{
-						uint16_t sensor1_y_start = CyFxGetSensor1param (0x3002);
-	                    uint16_t sensor1_x_start = CyFxGetSensor1param (0x3004);
-						uint16_t sensor1_y_end = CyFxGetSensor1param (0x3006);
-	                    uint16_t sensor1_x_end = CyFxGetSensor1param (0x3008);
-						uint16_t sensor2_y_start = CyFxGetSensor2param (0x3002);
-	                    uint16_t sensor2_x_start = CyFxGetSensor2param (0x3004);
-						uint16_t sensor2_y_end = CyFxGetSensor2param (0x3006);
-	                    uint16_t sensor2_x_end = CyFxGetSensor2param (0x3008);
+						uint16_t sensor1_y_start, sensor2_y_start;
+						uint16_t sensor1_x_start, sensor2_x_start;
+						uint16_t sensor1_y_end,   sensor2_y_end;
+						uint16_t sensor1_x_end,   sensor2_x_end;
+						CyFxGetBothSensorParams (0x3002, &sensor1_y_start, &sensor2_y_start);
+						CyFxGetBothSensorParams (0x3004, &sensor1_x_start, &sensor2_x_start);
+						CyFxGetBothSensorParams (0x3006, &sensor1_y_end,   &sensor2_y_end);
+						CyFxGetBothSensorParams (0x3008, &sensor1_x_end,   &sensor2_x_end);
 						CyU3PMemSet (glEp0Buffer, 0, sizeof (glEp0Buffer));
 						glEp0Buffer[0] = (uint8_t)(sensor1_y_start & 0x00FFu);
 						glEp0Buffer[1] = (uint8_t)((sensor1_y_start >> 8) & 0x00FFu);
@@ -3054,14 +3049,15 @@ CyFxAr0234WritePairAndCommit (uint16_t regAddr, uint16_t regData)
 static CyBool_t
 CyFxVerifyBinningRegPair (uint16_t regAddr, uint16_t expectedData)
 {
-	uint16_t sensor1Data = CyFxGetSensor1param (regAddr);
-	uint16_t sensor2Data = CyFxGetSensor2param (regAddr);
+	uint16_t sensor1Data = 0;
+	uint16_t sensor2Data = 0;
+
+	CyFxGetBothSensorParams (regAddr, &sensor1Data, &sensor2Data);
 
 	if ((sensor1Data != expectedData) || (sensor2Data != expectedData))
 	{
 		CyU3PThreadSleep (CY_FX_BINNING_VERIFY_RETRY_DELAY_MS);
-		sensor1Data = CyFxGetSensor1param (regAddr);
-		sensor2Data = CyFxGetSensor2param (regAddr);
+		CyFxGetBothSensorParams (regAddr, &sensor1Data, &sensor2Data);
 	}
 
 	if ((sensor1Data == expectedData) && (sensor2Data == expectedData))
@@ -3131,14 +3127,15 @@ CyFxVerifyBinningModeReadback (uint8_t mode)
 static CyBool_t
 CyFxVerifySensorRegPair (uint16_t regAddr, uint16_t expectedSensor1Data, uint16_t expectedSensor2Data)
 {
-	uint16_t sensor1Data = CyFxGetSensor1param (regAddr);
-	uint16_t sensor2Data = CyFxGetSensor2param (regAddr);
+	uint16_t sensor1Data = 0;
+	uint16_t sensor2Data = 0;
+
+	CyFxGetBothSensorParams (regAddr, &sensor1Data, &sensor2Data);
 
 	if ((sensor1Data != expectedSensor1Data) || (sensor2Data != expectedSensor2Data))
 	{
 		CyU3PThreadSleep (CY_FX_BINNING_VERIFY_RETRY_DELAY_MS);
-		sensor1Data = CyFxGetSensor1param (regAddr);
-		sensor2Data = CyFxGetSensor2param (regAddr);
+		CyFxGetBothSensorParams (regAddr, &sensor1Data, &sensor2Data);
 	}
 
 	if ((sensor1Data == expectedSensor1Data) && (sensor2Data == expectedSensor2Data))
@@ -3209,30 +3206,31 @@ static CyBool_t
 CyFxVerifyOffsetReadback (void)
 {
 	CyBool_t allPassed = CyTrue;
-	uint16_t readVal;
+	uint16_t sensor1Data;
+	uint16_t sensor2Data;
 
-#define CY_FX_VERIFY_OFFSET_REG(addr, expected) \
+#define CY_FX_VERIFY_OFFSET_REG(addr, expected1, expected2) \
 	do { \
-		readVal = CyFxGetSensor1param (addr); \
-		if (readVal != (expected)) { \
+		CyFxGetBothSensorParams ((addr), &sensor1Data, &sensor2Data); \
+		if ((sensor1Data != (expected1)) || (sensor2Data != (expected2))) { \
 			CyU3PThreadSleep (CY_FX_BINNING_VERIFY_RETRY_DELAY_MS); \
-			readVal = CyFxGetSensor1param (addr); \
+			CyFxGetBothSensorParams ((addr), &sensor1Data, &sensor2Data); \
 		} \
-		if (readVal != (expected)) { \
-			CyU3PDebugPrint (4, "OFFSET readback fail: reg=%d exp=%d got=%d\n", \
-					(int)(addr), (int)(expected), (int)readVal); \
+		if ((sensor1Data != (expected1)) || (sensor2Data != (expected2))) { \
+			CyU3PDebugPrint (4, "OFFSET readback fail: reg=%d exp1=%d exp2=%d s1=%d s2=%d\n", \
+					(int)(addr), (int)(expected1), (int)(expected2), (int)sensor1Data, (int)sensor2Data); \
 			allPassed = CyFalse; \
 		} \
 	} while (0)
 
-	CY_FX_VERIFY_OFFSET_REG(0x3002, AR0234ContextConfig.laserOffsetSensor1_y_start);
-	CY_FX_VERIFY_OFFSET_REG(0x308C, AR0234ContextConfig.whiteOffsetSensor1_y_start);
-	CY_FX_VERIFY_OFFSET_REG(0x3004, AR0234ContextConfig.laserOffsetSensor1_x_start);
-	CY_FX_VERIFY_OFFSET_REG(0x308A, AR0234ContextConfig.whiteOffsetSensor1_x_start);
-	CY_FX_VERIFY_OFFSET_REG(0x3006, AR0234ContextConfig.laserOffsetSensor1_y_end);
-	CY_FX_VERIFY_OFFSET_REG(0x3090, AR0234ContextConfig.whiteOffsetSensor1_y_end);
-	CY_FX_VERIFY_OFFSET_REG(0x3008, AR0234ContextConfig.laserOffsetSensor1_x_end);
-	CY_FX_VERIFY_OFFSET_REG(0x308E, AR0234ContextConfig.whiteOffsetSensor1_x_end);
+	CY_FX_VERIFY_OFFSET_REG(0x3002, AR0234ContextConfig.laserOffsetSensor1_y_start, AR0234ContextConfig.laserOffsetSensor2_y_start);
+	CY_FX_VERIFY_OFFSET_REG(0x308C, AR0234ContextConfig.whiteOffsetSensor1_y_start, AR0234ContextConfig.whiteOffsetSensor2_y_start);
+	CY_FX_VERIFY_OFFSET_REG(0x3004, AR0234ContextConfig.laserOffsetSensor1_x_start, AR0234ContextConfig.laserOffsetSensor2_x_start);
+	CY_FX_VERIFY_OFFSET_REG(0x308A, AR0234ContextConfig.whiteOffsetSensor1_x_start, AR0234ContextConfig.whiteOffsetSensor2_x_start);
+	CY_FX_VERIFY_OFFSET_REG(0x3006, AR0234ContextConfig.laserOffsetSensor1_y_end, AR0234ContextConfig.laserOffsetSensor2_y_end);
+	CY_FX_VERIFY_OFFSET_REG(0x3090, AR0234ContextConfig.whiteOffsetSensor1_y_end, AR0234ContextConfig.whiteOffsetSensor2_y_end);
+	CY_FX_VERIFY_OFFSET_REG(0x3008, AR0234ContextConfig.laserOffsetSensor1_x_end, AR0234ContextConfig.laserOffsetSensor2_x_end);
+	CY_FX_VERIFY_OFFSET_REG(0x308E, AR0234ContextConfig.whiteOffsetSensor1_x_end, AR0234ContextConfig.whiteOffsetSensor2_x_end);
 
 #undef CY_FX_VERIFY_OFFSET_REG
 
