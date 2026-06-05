@@ -77,6 +77,8 @@ uint8_t  glsaomswitchState = 1;          //扫描头检测失效标志
 /* Standalone GPIO-SPI worker is initialized once and kept alive across USB reconnects. */
 static CyBool_t gSpiStandaloneInited = CyFalse;
 static uint32_t glLastStopTime = 0u;
+static uint8_t gOffsetTxnExpectedIndex = 1u;
+static uint8_t gOffsetTxnReceivedMask = 0u;
 
 typedef enum CyFxDeviceReadyState_e {
 	CY_FX_DEVICE_READY_NOT_READY = 0,
@@ -96,9 +98,11 @@ static CyBool_t CyFxVerifyBinningModeReadback (uint8_t mode);
 static CyBool_t CyFxVerifyOffsetReadback (void);
 static CyBool_t CyFxVerifyGainReadback (void);
 static CyBool_t CyFxVerifyExposureReadback (void);
+static void CyFxApplyOffsetRegisters (void);
 static void CyFxUpdateDeviceReadyState (CyFxDeviceReadyState_t newState);
 static void CyFxScheduleSelfInit (void);
 static void CyFxRunSelfInit (void);
+//static void WaitFPGAStable (void);
 static void CyFxWaitForAr0234InitReady (void);
 CyU3PReturnStatus_t CyFxGetFPGAVersion (uint8_t *data, uint16_t length);
 void CyFxDeviceInit (uint16_t wValue, uint16_t wIndex, CyBool_t powerCycleFpga);
@@ -161,6 +165,12 @@ static inline void SetSnapState(CyBool_t isSnapActive, CyBool_t isPingpangActive
 {
     glIsSnapActive = isSnapActive;
     glIsPingpangActive = isPingpangActive;
+}
+
+static inline void CyFxResetOffsetTxnState (void)
+{
+	gOffsetTxnExpectedIndex = 1u;
+	gOffsetTxnReceivedMask = 0u;
 }
 
 CyBool_t SclGpioValue = CyTrue;
@@ -227,12 +237,26 @@ CyFxReadTouchSwitchFiltered (CyBool_t *touch1, CyBool_t *touch2)
 	*touch1 = (key1High > key1Low) ? CyTrue : CyFalse;
 	*touch2 = (key2High > key2Low) ? CyTrue : CyFalse;
 }
+#if 0
+static void
+WaitFPGAStable (void)
+{
+	CyU3PReturnStatus_t status = CY_U3P_ERROR_TIMEOUT;
+	uint8_t stableMark = 0u;
+	for (;;)
+	{
+		status = CyFxSpiProtoReadSelectedStatus8 (0x00u, &stableMark);
+		CyU3PDebugPrint (4, "WaitFPGAStable: stableMark=%d\n",(int)stableMark);
+		CyU3PThreadSleep (20);
+	}
+}
+#endif
 
 static void
 CyFxWaitForAr0234InitReady (void)
 {
-	const uint16_t yStart = 0u;
-	const uint16_t xStart = 0u;
+	const uint16_t yStart = 10u;
+	const uint16_t xStart = 20u;
 	const uint16_t yEnd = 999u;
 	const uint16_t xEnd = 1299u;
 	uint16_t s1yStart = 0u;
@@ -1483,7 +1507,6 @@ uint8_t CyFxGetFPGA_VCC(uint8_t* data)
 /* 用于处理 USB 设置请求的回调函数。 */
 CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
 {
-    uint16_t cmosdatatemp;
     uint8_t      i;
 	uint8_t  workmode;
     uint8_t  bRequest, bReqType;
@@ -2151,14 +2174,19 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
 	                CyFxAr0234WritePairAndCommit (0x3060, combinedGainValue);
 	                if (CyFxVerifyGainReadback () == CyFalse)
 	                {
-	                	CyU3PDebugPrint (4, "GAIN request failed (readback mismatch).\n");
-	                	CyU3PUsbStall (0, CyTrue, CyFalse);
-	                	break;
+                	    CyU3PDebugPrint (4, "GAIN readback fail, retrying write...\n");
+                	    CyFxAr0234WritePairAndCommit (0x3060, combinedGainValue);
+                	    if (CyFxVerifyGainReadback () == CyFalse)
+                	    {
+                		   CyU3PDebugPrint (4, "GAIN request failed (readback mismatch).\n");
+                		   CyU3PUsbStall (0, CyTrue, CyFalse);
+                		   break;
+                        }
 	                }
 
-	                CyU3PDebugPrint (4, "GAIN request successful, laser=%d white=%d\n",
-	                			(unsigned int)AR0234ContextConfig.laserGainSensor1,
-	                			(unsigned int)AR0234ContextConfig.whiteLightGainSensor1);
+                    CyU3PDebugPrint (4, "GAIN request successful, laser=%d white=%d\n",
+                                    (unsigned int)AR0234ContextConfig.laserGainSensor1,
+                                    (unsigned int)AR0234ContextConfig.whiteLightGainSensor1);
 					CyU3PUsbAckSetup ();
 					break;
 				}
@@ -2239,14 +2267,20 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
 	                CyFxAr0234WritePairAndCommit (0x3016, AR0234ContextConfig.whiteLightExposureSensor1);
 	                if (CyFxVerifyExposureReadback () == CyFalse)
 	                {
-	                	CyU3PDebugPrint (4, "EXPOSURE request failed (readback mismatch).\n");
-	                	CyU3PUsbStall (0, CyTrue, CyFalse);
-	                	break;
-	                }
+                	   CyU3PDebugPrint (4, "EXPOSURE readback fail, retrying write...\n");
+                	   CyFxAr0234WritePairAndCommit (0x3012, AR0234ContextConfig.laserExposureSensor1);
+                	   CyFxAr0234WritePairAndCommit (0x3016, AR0234ContextConfig.whiteLightExposureSensor1);
+                	   if (CyFxVerifyExposureReadback () == CyFalse)
+                	   {
+                		   CyU3PDebugPrint (4, "EXPOSURE request failed (readback mismatch).\n");
+                		   CyU3PUsbStall (0, CyTrue, CyFalse);
+                		   break;
+                	   }
+                    }
 
-	                CyU3PDebugPrint (4, "EXPOSURE request successful, laser=%d white=%d\n",
-	                			AR0234ContextConfig.laserExposureSensor1,
-	                			AR0234ContextConfig.whiteLightExposureSensor1);
+                    CyU3PDebugPrint (4, "EXPOSURE request successful, laser=%d white=%d\n",
+                		  AR0234ContextConfig.laserExposureSensor1,
+                		  AR0234ContextConfig.whiteLightExposureSensor1);
 					CyU3PUsbAckSetup ();
 					break;
 				}
@@ -2268,121 +2302,108 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
 					break;
                 #endif
 			
-					//设置偏移量D8：收到一条即下发并读回一条，不再等待第8次统一下发
+			    //设置偏移量D8：必须按 1..8 顺序下发，收齐后统一提交
                 case CY_FX_RQT_COMMAND_SETOFFSET:
+				{
+					if ((wIndex < 0x01u) || (wIndex > 0x08u))
+					{
+						CyU3PDebugPrint (4, "OFFSET invalid index: idx=%d, val=%d\n", (int)wIndex, (int)wValue);
+						CyFxResetOffsetTxnState ();
+						CyU3PUsbStall (0, CyTrue, CyFalse);
+						break;
+					}
 
-                	if (wIndex >= 0x01 && wIndex <= 0x04) //sensor1设置//
-                	{
-                		if(wIndex == 0x01) //y_start
-                		{
-							#ifdef DEBUG
-                			CyU3PDebugPrint (4, "sensor1 y_start = %d\n",wValue);
-							#endif
-                        	AR0234ContextConfig.laserOffsetSensor1_y_start = (uint16_t)(wValue);
-                        	AR0234ContextConfig.whiteOffsetSensor1_y_start = (uint16_t)(wValue);
-                		}
-                		else if(wIndex == 0x02) //x_start
-                		{
-							#ifdef DEBUG
-                			CyU3PDebugPrint (4, "sensor1 x_start = %d\n",wValue);
-							#endif
-                        	AR0234ContextConfig.laserOffsetSensor1_x_start = (uint16_t)(wValue);
-                        	AR0234ContextConfig.whiteOffsetSensor1_x_start = (uint16_t)(wValue);
-                		}
-                		else if(wIndex == 0x03) //y_end
-                		{
-                        	AR0234ContextConfig.laserOffsetSensor1_y_end = (uint16_t)(wValue);
-                        	AR0234ContextConfig.whiteOffsetSensor1_y_end = (uint16_t)(wValue);
-                		}
-                		else if(wIndex == 0x04) //x_end
-                		{
-                        	AR0234ContextConfig.laserOffsetSensor1_x_end = (uint16_t)(wValue);
-                        	AR0234ContextConfig.whiteOffsetSensor1_x_end = (uint16_t)(wValue);
-                		}
-                	}
+					if (wIndex != gOffsetTxnExpectedIndex)
+					{
+						CyU3PDebugPrint (4, "OFFSET out-of-order: exp=%d got=%d, val=%d\n",
+								(int)gOffsetTxnExpectedIndex, (int)wIndex, (int)wValue);
+						CyFxResetOffsetTxnState ();
+						CyU3PUsbStall (0, CyTrue, CyFalse);
+						break;
+					}
 
-                	else if(wIndex >= 0x05 && wIndex <= 0x08) //sensor2设置//
-                	{
-                   		if(wIndex == 0x05) //y_start
-                    	{
-                        	AR0234ContextConfig.laserOffsetSensor2_y_start = (uint16_t)(wValue);
-                        	AR0234ContextConfig.whiteOffsetSensor2_y_start = (uint16_t)(wValue);
-                    	}
-                    	else if(wIndex == 0x06) //x_start
-                    	{
-                        	AR0234ContextConfig.laserOffsetSensor2_x_start = (uint16_t)(wValue);
-                        	AR0234ContextConfig.whiteOffsetSensor2_x_start = (uint16_t)(wValue);
-                    	}
-                    	else if(wIndex == 0x07) //y_end
-                    	{
-                        	AR0234ContextConfig.laserOffsetSensor2_y_end = (uint16_t)(wValue);
-                        	AR0234ContextConfig.whiteOffsetSensor2_y_end = (uint16_t)(wValue);
-                    	}
-                    	else if(wIndex == 0x08) //x_end
-                    	{
-                        	AR0234ContextConfig.laserOffsetSensor2_x_end = (uint16_t)(wValue);
-                        	AR0234ContextConfig.whiteOffsetSensor2_x_end = (uint16_t)(wValue);
+					gOffsetTxnReceivedMask |= (uint8_t)(1u << (wIndex - 1u));
+					CyU3PDebugPrint (4, "HOST OFFSET cmd: idx=%d val=%d mask=%d\n",
+							(int)wIndex, (int)wValue, (int)gOffsetTxnReceivedMask);
 
-                            CyU3PThreadSleep (1000); //需要延时才能设置成功，具体原因未知//
-                			//y_start//
-                			AR0234_Write_Sensor2(0x3002,(uint16_t)(AR0234ContextConfig.laserOffsetSensor2_y_start)); //激光//
-                			AR0234_Write_Sensor1(0x3002,(uint16_t)(AR0234ContextConfig.laserOffsetSensor1_y_start)); //激光//
-						  	CyFxSpiProtoWrite8 (0x01, 0x81, 0x11);
-					        CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
+					switch (wIndex)
+					{
+						case 0x01:
+							AR0234ContextConfig.laserOffsetSensor1_y_start = (uint16_t)(wValue);
+							AR0234ContextConfig.whiteOffsetSensor1_y_start = (uint16_t)(wValue);
+							break;
+						case 0x02:
+							AR0234ContextConfig.laserOffsetSensor1_x_start = (uint16_t)(wValue);
+							AR0234ContextConfig.whiteOffsetSensor1_x_start = (uint16_t)(wValue);
+							break;
+						case 0x03:
+							AR0234ContextConfig.laserOffsetSensor1_y_end = (uint16_t)(wValue);
+							AR0234ContextConfig.whiteOffsetSensor1_y_end = (uint16_t)(wValue);
+							break;
+						case 0x04:
+							AR0234ContextConfig.laserOffsetSensor1_x_end = (uint16_t)(wValue);
+							AR0234ContextConfig.whiteOffsetSensor1_x_end = (uint16_t)(wValue);
+							break;
+						case 0x05:
+							AR0234ContextConfig.laserOffsetSensor2_y_start = (uint16_t)(wValue);
+							AR0234ContextConfig.whiteOffsetSensor2_y_start = (uint16_t)(wValue);
+							break;
+						case 0x06:
+							AR0234ContextConfig.laserOffsetSensor2_x_start = (uint16_t)(wValue);
+							AR0234ContextConfig.whiteOffsetSensor2_x_start = (uint16_t)(wValue);
+							break;
+						case 0x07:
+							AR0234ContextConfig.laserOffsetSensor2_y_end = (uint16_t)(wValue);
+							AR0234ContextConfig.whiteOffsetSensor2_y_end = (uint16_t)(wValue);
+							break;
+						case 0x08:
+							AR0234ContextConfig.laserOffsetSensor2_x_end = (uint16_t)(wValue);
+							AR0234ContextConfig.whiteOffsetSensor2_x_end = (uint16_t)(wValue);
+							break;
+						default:
+							CyFxResetOffsetTxnState ();
+							CyU3PUsbStall (0, CyTrue, CyFalse);
+							break;
+					}
 
-                            AR0234_Write_Sensor2(0x308C,(uint16_t)(AR0234ContextConfig.whiteOffsetSensor2_y_start)); //白光//
-                            AR0234_Write_Sensor1(0x308C,(uint16_t)(AR0234ContextConfig.whiteOffsetSensor1_y_start)); //白光//
-					  	    CyFxSpiProtoWrite8 (0x01, 0x81, 0x11);
-					        CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
+					if (wIndex != 0x08u)
+					{
+						gOffsetTxnExpectedIndex = (uint8_t)(wIndex + 1u);
+						CyU3PThreadSleep (10);
+						CyU3PUsbAckSetup ();
+						break;
+					}
 
-                            //x_start//
-                  			AR0234_Write_Sensor2(0x3004,(uint16_t)(AR0234ContextConfig.laserOffsetSensor2_x_start)); //激光//
-                    		AR0234_Write_Sensor1(0x3004,(uint16_t)(AR0234ContextConfig.laserOffsetSensor1_x_start)); //激光//
-					        CyFxSpiProtoWrite8 (0x01, 0x81, 0x11);
-					        CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
+					if (gOffsetTxnReceivedMask != 0xFFu)
+					{
+						CyU3PDebugPrint (4, "OFFSET incomplete sequence: mask=%d\n", (int)gOffsetTxnReceivedMask);
+						CyFxResetOffsetTxnState ();
+						CyU3PUsbStall (0, CyTrue, CyFalse);
+						break;
+					}
 
-                    		AR0234_Write_Sensor2(0x308A,(uint16_t)(AR0234ContextConfig.whiteOffsetSensor2_x_start)); //白光//
-                    		AR0234_Write_Sensor1(0x308A,(uint16_t)(AR0234ContextConfig.whiteOffsetSensor1_x_start)); //白光//
-					        CyFxSpiProtoWrite8 (0x01, 0x81, 0x11);
-					        CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
+					CyFxApplyOffsetRegisters ();
+					if (CyFxVerifyOffsetReadback () == CyFalse)
+					{
+						CyU3PDebugPrint (4, "OFFSET readback fail, retrying write...\n");
+						CyFxApplyOffsetRegisters ();
+						if (CyFxVerifyOffsetReadback () == CyFalse)
+						{
+							CyU3PDebugPrint (4, "OFFSET request failed (readback mismatch).\n");
+							CyFxResetOffsetTxnState ();
+							CyU3PUsbStall (0, CyTrue, CyFalse);
+							break;
+						}
+					}
 
-                            //y_end//
-                   			AR0234_Write_Sensor2(0x3006,(uint16_t)(AR0234ContextConfig.laserOffsetSensor2_y_end)); //激光//
-                   			AR0234_Write_Sensor1(0x3006,(uint16_t)(AR0234ContextConfig.laserOffsetSensor1_y_end)); //激光//
-					        CyFxSpiProtoWrite8 (0x01, 0x81, 0x11);
-					        CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
-
-                   			AR0234_Write_Sensor2(0x3090,(uint16_t)(AR0234ContextConfig.whiteOffsetSensor2_y_end)); //白光//
-                   			AR0234_Write_Sensor1(0x3090,(uint16_t)(AR0234ContextConfig.whiteOffsetSensor1_y_end)); //白光//
-					   	    CyFxSpiProtoWrite8 (0x01, 0x81, 0x11);
-					        CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
-                            //x_end//
-                			AR0234_Write_Sensor2(0x3008,(uint16_t)(AR0234ContextConfig.laserOffsetSensor2_x_end)); //激光//
-                			AR0234_Write_Sensor1(0x3008,(uint16_t)(AR0234ContextConfig.laserOffsetSensor1_x_end)); //激光//
-					  	    CyFxSpiProtoWrite8 (0x01, 0x81, 0x11);
-					        CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
-
-                			AR0234_Write_Sensor2(0x308E,(uint16_t)(AR0234ContextConfig.whiteOffsetSensor2_x_end)); //白光//
-                			AR0234_Write_Sensor1(0x308E,(uint16_t)(AR0234ContextConfig.whiteOffsetSensor1_x_end)); //白光//
-					  	    CyFxSpiProtoWrite8 (0x01, 0x81, 0x11);
-					  	    CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
-							if (CyFxVerifyOffsetReadback () == CyFalse)
-							{
-								CyU3PDebugPrint (4, "OFFSET request failed (readback mismatch).\n");
-								CyU3PUsbStall (0, CyTrue, CyFalse);
-								break;
-							}
-							else
-							{
-								CyU3PDebugPrint (4, "OFFSET request successful, x_start=%d, y_start=%d, x_end=%d, y_end=%d\n",
-									AR0234ContextConfig.laserOffsetSensor2_x_start, AR0234ContextConfig.laserOffsetSensor2_y_start,
-									AR0234ContextConfig.laserOffsetSensor2_x_end, AR0234ContextConfig.laserOffsetSensor2_y_end);
-							}
-                    	}
-                	}
-  					CyU3PThreadSleep (10);
-    				CyU3PUsbAckSetup ();
-                	break;
+					CyU3PDebugPrint (4, "OFFSET request successful, x_start=%d, y_start=%d, x_end=%d, y_end=%d\n",
+							AR0234ContextConfig.laserOffsetSensor2_x_start, AR0234ContextConfig.laserOffsetSensor2_y_start,
+							AR0234ContextConfig.laserOffsetSensor2_x_end, AR0234ContextConfig.laserOffsetSensor2_y_end);
+					CyFxResetOffsetTxnState ();
+					CyU3PThreadSleep (10);
+					CyU3PUsbAckSetup ();
+					break;
+				}
 
                 case CY_FX_RQT_COMMAND_LED_1:
                 	CyFxSpiProtoWrite8 (0x01, 0x0B, 0);           //turn off LED_2
@@ -3136,17 +3157,85 @@ CyFxVerifySensorRegPair (uint16_t regAddr, uint16_t expectedSensor1Data, uint16_
 	return CyFalse;
 }
 
+static void
+CyFxApplyOffsetRegisters (void)
+{
+	//y_start//
+	AR0234_Write_Sensor2(0x3002,(uint16_t)(AR0234ContextConfig.laserOffsetSensor2_y_start));
+	AR0234_Write_Sensor1(0x3002,(uint16_t)(AR0234ContextConfig.laserOffsetSensor1_y_start));
+	CyFxSpiProtoWrite8 (0x01, 0x81, 0x11);
+	CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
+
+	AR0234_Write_Sensor2(0x308C,(uint16_t)(AR0234ContextConfig.whiteOffsetSensor2_y_start));
+	AR0234_Write_Sensor1(0x308C,(uint16_t)(AR0234ContextConfig.whiteOffsetSensor1_y_start));
+	CyFxSpiProtoWrite8 (0x01, 0x81, 0x11);
+	CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
+
+	//x_start//
+	AR0234_Write_Sensor2(0x3004,(uint16_t)(AR0234ContextConfig.laserOffsetSensor2_x_start));
+	AR0234_Write_Sensor1(0x3004,(uint16_t)(AR0234ContextConfig.laserOffsetSensor1_x_start));
+	CyFxSpiProtoWrite8 (0x01, 0x81, 0x11);
+	CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
+
+	AR0234_Write_Sensor2(0x308A,(uint16_t)(AR0234ContextConfig.whiteOffsetSensor2_x_start));
+	AR0234_Write_Sensor1(0x308A,(uint16_t)(AR0234ContextConfig.whiteOffsetSensor1_x_start));
+	CyFxSpiProtoWrite8 (0x01, 0x81, 0x11);
+	CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
+
+	//y_end//
+	AR0234_Write_Sensor2(0x3006,(uint16_t)(AR0234ContextConfig.laserOffsetSensor2_y_end));
+	AR0234_Write_Sensor1(0x3006,(uint16_t)(AR0234ContextConfig.laserOffsetSensor1_y_end));
+	CyFxSpiProtoWrite8 (0x01, 0x81, 0x11);
+	CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
+
+	AR0234_Write_Sensor2(0x3090,(uint16_t)(AR0234ContextConfig.whiteOffsetSensor2_y_end));
+	AR0234_Write_Sensor1(0x3090,(uint16_t)(AR0234ContextConfig.whiteOffsetSensor1_y_end));
+	CyFxSpiProtoWrite8 (0x01, 0x81, 0x11);
+	CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
+
+	//x_end//
+	AR0234_Write_Sensor2(0x3008,(uint16_t)(AR0234ContextConfig.laserOffsetSensor2_x_end));
+	AR0234_Write_Sensor1(0x3008,(uint16_t)(AR0234ContextConfig.laserOffsetSensor1_x_end));
+	CyFxSpiProtoWrite8 (0x01, 0x81, 0x11);
+	CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
+
+	AR0234_Write_Sensor2(0x308E,(uint16_t)(AR0234ContextConfig.whiteOffsetSensor2_x_end));
+	AR0234_Write_Sensor1(0x308E,(uint16_t)(AR0234ContextConfig.whiteOffsetSensor1_x_end));
+	CyFxSpiProtoWrite8 (0x01, 0x81, 0x11);
+	CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
+}
+
 static CyBool_t
 CyFxVerifyOffsetReadback (void)
 {
 	CyBool_t allPassed = CyTrue;
+	uint16_t readVal;
 
-	if (CyFxVerifySensorRegPair (0x3002,
-			AR0234ContextConfig.laserOffsetSensor1_y_start,
-			AR0234ContextConfig.laserOffsetSensor2_y_start) == CyFalse) { allPassed = CyFalse; }
-	if (CyFxVerifySensorRegPair (0x3008,
-			AR0234ContextConfig.laserOffsetSensor1_x_end,
-			AR0234ContextConfig.laserOffsetSensor2_x_end) == CyFalse) { allPassed = CyFalse; }
+#define CY_FX_VERIFY_OFFSET_REG(addr, expected) \
+	do { \
+		readVal = CyFxGetSensor1param (addr); \
+		if (readVal != (expected)) { \
+			CyU3PThreadSleep (CY_FX_BINNING_VERIFY_RETRY_DELAY_MS); \
+			readVal = CyFxGetSensor1param (addr); \
+		} \
+		if (readVal != (expected)) { \
+			CyU3PDebugPrint (4, "OFFSET readback fail: reg=%d exp=%d got=%d\n", \
+					(int)(addr), (int)(expected), (int)readVal); \
+			allPassed = CyFalse; \
+		} \
+	} while (0)
+
+	CY_FX_VERIFY_OFFSET_REG(0x3002, AR0234ContextConfig.laserOffsetSensor1_y_start);
+	CY_FX_VERIFY_OFFSET_REG(0x308C, AR0234ContextConfig.whiteOffsetSensor1_y_start);
+	CY_FX_VERIFY_OFFSET_REG(0x3004, AR0234ContextConfig.laserOffsetSensor1_x_start);
+	CY_FX_VERIFY_OFFSET_REG(0x308A, AR0234ContextConfig.whiteOffsetSensor1_x_start);
+	CY_FX_VERIFY_OFFSET_REG(0x3006, AR0234ContextConfig.laserOffsetSensor1_y_end);
+	CY_FX_VERIFY_OFFSET_REG(0x3090, AR0234ContextConfig.whiteOffsetSensor1_y_end);
+	CY_FX_VERIFY_OFFSET_REG(0x3008, AR0234ContextConfig.laserOffsetSensor1_x_end);
+	CY_FX_VERIFY_OFFSET_REG(0x308E, AR0234ContextConfig.whiteOffsetSensor1_x_end);
+
+#undef CY_FX_VERIFY_OFFSET_REG
+
 	return allPassed;
 }
 

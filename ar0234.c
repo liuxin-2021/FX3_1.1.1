@@ -494,6 +494,8 @@ void AR0234_DumpCoreModeRegisters_Sequential100ms(void)
 	CyU3PDebugPrint(4, "REG read reg=0x30A8 s1=%d\n", s1);
 	CyU3PDebugPrint(4, "REG read reg=0x30A8 s2=%d\n", s2);
 	#endif
+	(void)s1;
+	(void)s2;
 }
 
 void AR0234_Context_Init ()
