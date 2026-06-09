@@ -26,7 +26,7 @@
 #define CY_FX_APP_SELF_INIT_EVENT        (1 << 3)   /* Request device self-init in thread context. */
 /* Runtime IO matrix GPIO[63:32] bitmap. Keep this in sync with CyFxApplicationDefine. */
 #define CY_FX_RUNTIME_GPIO_SIMPLE_EN1    (0x121C2000u)
-#define CY_FX_BINNING_SETTLE_DELAY_MS    (100u)
+#define CY_FX_BINNING_SETTLE_DELAY_MS    (10u)
 #define CY_FX_BINNING_VERIFY_RETRY_DELAY_MS (20u)
 //#define DEF_UART_BAUDRATE                (115200)    /* Baud rate for UART communication. */
 CyU3PEvent glFxGpioAppEvent;            /* GPIO input event group. */
@@ -93,6 +93,7 @@ typedef enum CyFxDeviceReadyState_e {
 static volatile CyFxDeviceReadyState_t glDeviceReadyState = CY_FX_DEVICE_READY_NOT_READY;
 
 static void CyFxAr0234WritePairAndCommit (uint16_t regAddr, uint16_t regData);
+static CyBool_t CyFxWriteBinningModeRegisters (uint8_t mode);
 static CyBool_t CyFxApplyBinningMode (uint8_t mode);
 static CyBool_t CyFxVerifyBinningModeReadback (uint8_t mode);
 static CyBool_t CyFxVerifyOffsetReadback (void);
@@ -1716,7 +1717,7 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
 						}
                 	}
 
-					CyU3PDebugPrint(4, "glEp0Buffer[0] = %d\n", (int)glEp0Buffer[0]);
+					//CyU3PDebugPrint(4, "glEp0Buffer[0] = %d\n", (int)glEp0Buffer[0]);
                 	CyU3PUsbSendEP0Data (2, glEp0Buffer);
                 	break;
 
@@ -3264,7 +3265,7 @@ CyFxVerifyExposureReadback (void)
 }
 
 static CyBool_t
-CyFxApplyBinningMode (uint8_t mode)
+CyFxWriteBinningModeRegisters (uint8_t mode)
 {
 	if (mode == normal_mode)
 	{
@@ -3276,18 +3277,8 @@ CyFxApplyBinningMode (uint8_t mode)
 		CyFxAr0234WritePairAndCommit (0x3040, 0x0000);
 		CyFxAr0234WritePairAndCommit (0x30AE, 0x0001);
 		CyFxAr0234WritePairAndCommit (0x30A8, 0x0001);
-		CyFxSpiProtoWrite8 (0x01, 0x86, 0x00); 
-		CyU3PThreadSleep (CY_FX_BINNING_SETTLE_DELAY_MS);
-		if (CyFxVerifyBinningModeReadback (mode) == CyTrue)
-		{
-			CyU3PDebugPrint (4, "Normal mode configuration done (readback ok).\n");
-			return CyTrue;
-		}
-		else
-		{
-			CyU3PDebugPrint (4, "Normal mode readback verification failed.\n");
-			return CyFalse;
-		}
+		CyFxSpiProtoWrite8 (0x01, 0x86, 0x00);
+		return CyTrue;
 	}
 	else if (mode == binning_sum)
 	{
@@ -3299,18 +3290,8 @@ CyFxApplyBinningMode (uint8_t mode)
 		CyFxAr0234WritePairAndCommit (0x3040, 0x3C20);
 		CyFxAr0234WritePairAndCommit (0x30AE, 0x0003);
 		CyFxAr0234WritePairAndCommit (0x30A8, 0x0003);
-		CyFxSpiProtoWrite8 (0x01, 0x86, 0x01); 
-		CyU3PThreadSleep (CY_FX_BINNING_SETTLE_DELAY_MS);
-		if (CyFxVerifyBinningModeReadback (mode) == CyTrue)
-		{
-			CyU3PDebugPrint (4, "Binning sum mode configuration done (readback ok).\n");
-			return CyTrue;
-		}
-		else
-		{
-			CyU3PDebugPrint (4, "Binning sum mode readback verification failed.\n");
-			return CyFalse;
-		}
+		CyFxSpiProtoWrite8 (0x01, 0x86, 0x01);
+		return CyTrue;
 	}
 	else if (mode == binning_average)
 	{
@@ -3322,24 +3303,53 @@ CyFxApplyBinningMode (uint8_t mode)
 		CyFxAr0234WritePairAndCommit (0x3040, 0x3C00);
 		CyFxAr0234WritePairAndCommit (0x30AE, 0x0003);
 		CyFxAr0234WritePairAndCommit (0x30A8, 0x0003);
-		CyFxSpiProtoWrite8 (0x01, 0x86, 0x01); 
-		CyU3PThreadSleep (CY_FX_BINNING_SETTLE_DELAY_MS);
-		if (CyFxVerifyBinningModeReadback (mode) == CyTrue)
-		{
-			CyU3PDebugPrint (4, "Binning average mode configuration done (readback ok).\n");
-			return CyTrue;
-		}
-		else
-		{
-			CyU3PDebugPrint (4, "Binning average mode readback verification failed.\n");
-			return CyFalse;
-		}
+		CyFxSpiProtoWrite8 (0x01, 0x86, 0x01);
+		return CyTrue;
 	}
-	else
+
+	return CyFalse;
+}
+
+static CyBool_t
+CyFxApplyBinningMode (uint8_t mode)
+{
+	if (CyFxWriteBinningModeRegisters (mode) == CyFalse)
 	{
 		CyU3PDebugPrint (4, "BINNING mode unsupported: %d\n", mode);
 		return CyFalse;
 	}
+
+	CyU3PThreadSleep (CY_FX_BINNING_SETTLE_DELAY_MS);
+	if (CyFxVerifyBinningModeReadback (mode) == CyFalse)
+	{
+		CyU3PDebugPrint (4, "BINNING readback fail, retrying write, mode=%d\n", mode);
+		if (CyFxWriteBinningModeRegisters (mode) == CyFalse)
+		{
+			CyU3PDebugPrint (4, "BINNING mode unsupported: %d\n", mode);
+			return CyFalse;
+		}
+		CyU3PThreadSleep (CY_FX_BINNING_SETTLE_DELAY_MS);
+		if (CyFxVerifyBinningModeReadback (mode) == CyFalse)
+		{
+			CyU3PDebugPrint (4, "BINNING request failed (readback mismatch), mode=%d\n", mode);
+			return CyFalse;
+		}
+	}
+
+	if (mode == normal_mode)
+	{
+		CyU3PDebugPrint (4, "Normal mode configuration done (readback ok).\n");
+	}
+	else if (mode == binning_average)
+	{
+		CyU3PDebugPrint (4, "Binning average mode configuration done (readback ok).\n");
+	}
+	else
+	{
+		CyU3PDebugPrint (4, "Binning sum mode configuration done (readback ok).\n");
+	}
+
+	return CyTrue;
 }
 /* JY901 陀螺仪数据流线程入口 */
 void slJY901AppThread_Entry(uint32_t input)
