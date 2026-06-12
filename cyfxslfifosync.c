@@ -93,9 +93,11 @@ typedef enum CyFxDeviceReadyState_e {
 static volatile CyFxDeviceReadyState_t glDeviceReadyState = CY_FX_DEVICE_READY_NOT_READY;
 
 static void CyFxAr0234WritePairAndCommit (uint16_t regAddr, uint16_t regData);
-static CyBool_t CyFxWriteBinningModeRegisters (uint8_t mode);
+static void CyFxAr0234WriteIndependentAndCommit (uint16_t regAddr, uint16_t sensor1Data, uint16_t sensor2Data);
+static CyBool_t CyFxWriteBinningModeRegisters (uint8_t mode, uint16_t s1AXEnd, uint16_t s2AXEnd, uint16_t s1BXEnd, uint16_t s2BXEnd);
 static CyBool_t CyFxApplyBinningMode (uint8_t mode);
-static CyBool_t CyFxVerifyBinningModeReadback (uint8_t mode);
+static CyBool_t CyFxVerifyBinningModeReadback (uint8_t mode, uint16_t s1AXEnd, uint16_t s2AXEnd, uint16_t s1BXEnd, uint16_t s2BXEnd);
+static CyBool_t CyFxVerifySensorRegPair (uint16_t regAddr, uint16_t expectedSensor1Data, uint16_t expectedSensor2Data);
 static CyBool_t CyFxVerifyOffsetReadback (void);
 static CyBool_t CyFxVerifyGainReadback (void);
 static CyBool_t CyFxVerifyExposureReadback (void);
@@ -1875,7 +1877,7 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
 					CyU3PDebugPrint (4, "glsaomswitchState value=%d\n",glsaomswitchState);
 					CyU3PUsbAckSetup ();
                     break;
-
+                
 				case CY_FX_BINNING_STATE:
 					workmode = (uint8_t)(wValue & 0xff);
 					if (CyFxApplyBinningMode (workmode) == CyTrue)
@@ -1889,7 +1891,7 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
 						CyU3PUsbStall (0, CyTrue, CyFalse);
 					}
 					break;
-			
+			    
 				case CY_FX_LASER_CYCLE_SETTING:
 
 				  	currentData.laserPeriod = ((uint32_t)(wValue*50000));//value单位是毫秒
@@ -2224,34 +2226,160 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
 				//读取偏移量参数
 				case REPORT_OFFSET:
 				{
-						uint16_t sensor1_y_start, sensor2_y_start;
-						uint16_t sensor1_x_start, sensor2_x_start;
-						uint16_t sensor1_y_end,   sensor2_y_end;
-						uint16_t sensor1_x_end,   sensor2_x_end;
-						CyFxGetBothSensorParams (0x3002, &sensor1_y_start, &sensor2_y_start);
-						CyFxGetBothSensorParams (0x3004, &sensor1_x_start, &sensor2_x_start);
-						CyFxGetBothSensorParams (0x3006, &sensor1_y_end,   &sensor2_y_end);
-						CyFxGetBothSensorParams (0x3008, &sensor1_x_end,   &sensor2_x_end);
+						uint16_t sensor1_laser_y_start, sensor2_laser_y_start;
+						uint16_t sensor1_laser_x_start, sensor2_laser_x_start;
+						uint16_t sensor1_laser_y_end,   sensor2_laser_y_end;
+						uint16_t sensor1_laser_x_end,   sensor2_laser_x_end;
+						uint16_t sensor1_white_y_start, sensor2_white_y_start;
+						uint16_t sensor1_white_x_start, sensor2_white_x_start;
+						uint16_t sensor1_white_y_end,   sensor2_white_y_end;
+						uint16_t sensor1_white_x_end,   sensor2_white_x_end;					
+						CyFxGetBothSensorParams (0x3002, &sensor1_laser_y_start, &sensor2_laser_y_start);
+						CyFxGetBothSensorParams (0x3004, &sensor1_laser_x_start, &sensor2_laser_x_start);
+						CyFxGetBothSensorParams (0x3006, &sensor1_laser_y_end,   &sensor2_laser_y_end);
+						CyFxGetBothSensorParams (0x3008, &sensor1_laser_x_end,   &sensor2_laser_x_end);
+						CyFxGetBothSensorParams(0x308C,&sensor1_white_y_start, &sensor2_white_y_start);
+						CyFxGetBothSensorParams(0x308A,&sensor1_white_x_start, &sensor2_white_x_start);
+						CyFxGetBothSensorParams(0x3090,&sensor1_white_y_end,	&sensor2_white_y_end);
+						CyFxGetBothSensorParams(0x308E,&sensor1_white_x_end,	&sensor2_white_x_end);
 						CyU3PMemSet (glEp0Buffer, 0, sizeof (glEp0Buffer));
-						glEp0Buffer[0] = (uint8_t)(sensor1_y_start & 0x00FFu);
-						glEp0Buffer[1] = (uint8_t)((sensor1_y_start >> 8) & 0x00FFu);
-						glEp0Buffer[2] = (uint8_t)(sensor1_x_start & 0x00FFu);
-						glEp0Buffer[3] = (uint8_t)((sensor1_x_start >> 8) & 0x00FFu);
-						glEp0Buffer[4] = (uint8_t)(sensor1_y_end & 0x00FFu);
-						glEp0Buffer[5] = (uint8_t)((sensor1_y_end >> 8) & 0x00FFu);
-						glEp0Buffer[6] = (uint8_t)(sensor1_x_end & 0x00FFu);
-						glEp0Buffer[7] = (uint8_t)((sensor1_x_end >> 8) & 0x00FFu);
-						glEp0Buffer[8] = (uint8_t)(sensor2_y_start & 0x00FFu);
-						glEp0Buffer[9] = (uint8_t)((sensor2_y_start >> 8) & 0x00FFu);
-						glEp0Buffer[10] = (uint8_t)(sensor2_x_start & 0x00FFu);
-						glEp0Buffer[11] = (uint8_t)((sensor2_x_start >> 8) & 0x00FFu);
-						glEp0Buffer[12] = (uint8_t)(sensor2_y_end & 0x00FFu);
-						glEp0Buffer[13] = (uint8_t)((sensor2_y_end >> 8) & 0x00FFu);
-						glEp0Buffer[14] = (uint8_t)(sensor2_x_end & 0x00FFu);
-						glEp0Buffer[15] = (uint8_t)((sensor2_x_end >> 8) & 0x00FFu);
-						CyU3PUsbSendEP0Data (16, glEp0Buffer);
+						/* --- laser sensor1 [0..7] --- */
+						glEp0Buffer[0]  = (uint8_t)(sensor1_laser_y_start & 0x00FFu);
+						glEp0Buffer[1]  = (uint8_t)((sensor1_laser_y_start >> 8) & 0x00FFu);
+						glEp0Buffer[2]  = (uint8_t)(sensor1_laser_x_start & 0x00FFu);
+						glEp0Buffer[3]  = (uint8_t)((sensor1_laser_x_start >> 8) & 0x00FFu);
+						glEp0Buffer[4]  = (uint8_t)(sensor1_laser_y_end & 0x00FFu);
+						glEp0Buffer[5]  = (uint8_t)((sensor1_laser_y_end >> 8) & 0x00FFu);
+						glEp0Buffer[6]  = (uint8_t)(sensor1_laser_x_end & 0x00FFu);
+						glEp0Buffer[7]  = (uint8_t)((sensor1_laser_x_end >> 8) & 0x00FFu);
+						/* --- laser sensor2 [8..15] --- */
+						glEp0Buffer[8]  = (uint8_t)(sensor2_laser_y_start & 0x00FFu);
+						glEp0Buffer[9]  = (uint8_t)((sensor2_laser_y_start >> 8) & 0x00FFu);
+						glEp0Buffer[10] = (uint8_t)(sensor2_laser_x_start & 0x00FFu);
+						glEp0Buffer[11] = (uint8_t)((sensor2_laser_x_start >> 8) & 0x00FFu);
+						glEp0Buffer[12] = (uint8_t)(sensor2_laser_y_end & 0x00FFu);
+						glEp0Buffer[13] = (uint8_t)((sensor2_laser_y_end >> 8) & 0x00FFu);
+						glEp0Buffer[14] = (uint8_t)(sensor2_laser_x_end & 0x00FFu);
+						glEp0Buffer[15] = (uint8_t)((sensor2_laser_x_end >> 8) & 0x00FFu);
+						/* --- white sensor1 [16..23] --- */
+						glEp0Buffer[16] = (uint8_t)(sensor1_white_y_start & 0x00FFu);
+						glEp0Buffer[17] = (uint8_t)((sensor1_white_y_start >> 8) & 0x00FFu);
+						glEp0Buffer[18] = (uint8_t)(sensor1_white_x_start & 0x00FFu);
+						glEp0Buffer[19] = (uint8_t)((sensor1_white_x_start >> 8) & 0x00FFu);
+						glEp0Buffer[20] = (uint8_t)(sensor1_white_y_end & 0x00FFu);
+						glEp0Buffer[21] = (uint8_t)((sensor1_white_y_end >> 8) & 0x00FFu);
+						glEp0Buffer[22] = (uint8_t)(sensor1_white_x_end & 0x00FFu);
+						glEp0Buffer[23] = (uint8_t)((sensor1_white_x_end >> 8) & 0x00FFu);
+						/* --- white sensor2 [24..31] --- */
+						glEp0Buffer[24] = (uint8_t)(sensor2_white_y_start & 0x00FFu);
+						glEp0Buffer[25] = (uint8_t)((sensor2_white_y_start >> 8) & 0x00FFu);
+						glEp0Buffer[26] = (uint8_t)(sensor2_white_x_start & 0x00FFu);
+						glEp0Buffer[27] = (uint8_t)((sensor2_white_x_start >> 8) & 0x00FFu);
+						glEp0Buffer[28] = (uint8_t)(sensor2_white_y_end & 0x00FFu);
+						glEp0Buffer[29] = (uint8_t)((sensor2_white_y_end >> 8) & 0x00FFu);
+						glEp0Buffer[30] = (uint8_t)(sensor2_white_x_end & 0x00FFu);
+						glEp0Buffer[31] = (uint8_t)((sensor2_white_x_end >> 8) & 0x00FFu);
+						CyU3PDebugPrint (4, "REPORT_OFFSET laser s1: ys=%d xs=%d ye=%d xe=%d\n",
+								sensor1_laser_y_start, sensor1_laser_x_start,
+								sensor1_laser_y_end,  sensor1_laser_x_end);
+						CyU3PDebugPrint (4, "REPORT_OFFSET laser s2: ys=%d xs=%d ye=%d xe=%d\n",
+								sensor2_laser_y_start, sensor2_laser_x_start,
+								sensor2_laser_y_end,   sensor2_laser_x_end);
+						CyU3PDebugPrint (4, "REPORT_OFFSET white s1: ys=%d xs=%d ye=%d xe=%d\n",
+								sensor1_white_y_start, sensor1_white_x_start,
+								sensor1_white_y_end,  sensor1_white_x_end);
+						CyU3PDebugPrint (4, "REPORT_OFFSET white s2: ys=%d xs=%d ye=%d xe=%d\n",
+								sensor2_white_y_start, sensor2_white_x_start,
+								sensor2_white_y_end,  sensor2_white_x_end);
+						CyU3PUsbSendEP0Data (32, glEp0Buffer);
+                        
 						break;
 				}
+
+				case  REPORT_BINNING_MODE:
+				{
+					uint16_t bS1, bS2;
+					CyU3PMemSet (glEp0Buffer, 0, sizeof (glEp0Buffer));
+
+					/* 0x30B0 Digital_Binning */
+					CyFxGetBothSensorParams (0x30B0, &bS1, &bS2);
+					glEp0Buffer[0]  = (uint8_t)(bS1 & 0x00FFu);
+					glEp0Buffer[1]  = (uint8_t)((bS1 >> 8) & 0x00FFu);
+					glEp0Buffer[2]  = (uint8_t)(bS2 & 0x00FFu);
+					glEp0Buffer[3]  = (uint8_t)((bS2 >> 8) & 0x00FFu);
+
+					/* 0x3008 X_ADDR_END sensor A */
+					CyFxGetBothSensorParams (0x3008, &bS1, &bS2);
+					glEp0Buffer[4]  = (uint8_t)(bS1 & 0x00FFu);
+					glEp0Buffer[5]  = (uint8_t)((bS1 >> 8) & 0x00FFu);
+					glEp0Buffer[6]  = (uint8_t)(bS2 & 0x00FFu);
+					glEp0Buffer[7]  = (uint8_t)((bS2 >> 8) & 0x00FFu);
+
+					/* 0x308E X_ADDR_END sensor B */
+					CyFxGetBothSensorParams (0x308E, &bS1, &bS2);
+					glEp0Buffer[8]  = (uint8_t)(bS1 & 0x00FFu);
+					glEp0Buffer[9]  = (uint8_t)((bS1 >> 8) & 0x00FFu);
+					glEp0Buffer[10] = (uint8_t)(bS2 & 0x00FFu);
+					glEp0Buffer[11] = (uint8_t)((bS2 >> 8) & 0x00FFu);
+
+					/* 0x30A2 X_ODD_INC */
+					CyFxGetBothSensorParams (0x30A2, &bS1, &bS2);
+					glEp0Buffer[12] = (uint8_t)(bS1 & 0x00FFu);
+					glEp0Buffer[13] = (uint8_t)((bS1 >> 8) & 0x00FFu);
+					glEp0Buffer[14] = (uint8_t)(bS2 & 0x00FFu);
+					glEp0Buffer[15] = (uint8_t)((bS2 >> 8) & 0x00FFu);
+
+					/* 0x30A6 Y_ODD_INC */
+					CyFxGetBothSensorParams (0x30A6, &bS1, &bS2);
+					glEp0Buffer[16] = (uint8_t)(bS1 & 0x00FFu);
+					glEp0Buffer[17] = (uint8_t)((bS1 >> 8) & 0x00FFu);
+					glEp0Buffer[18] = (uint8_t)(bS2 & 0x00FFu);
+					glEp0Buffer[19] = (uint8_t)((bS2 >> 8) & 0x00FFu);
+
+					/* 0x3040 Read_Mode */
+					CyFxGetBothSensorParams (0x3040, &bS1, &bS2);
+					glEp0Buffer[20] = (uint8_t)(bS1 & 0x00FFu);
+					glEp0Buffer[21] = (uint8_t)((bS1 >> 8) & 0x00FFu);
+					glEp0Buffer[22] = (uint8_t)(bS2 & 0x00FFu);
+					glEp0Buffer[23] = (uint8_t)((bS2 >> 8) & 0x00FFu);
+
+					/* 0x30AE X_ODD_INC_CB */
+					CyFxGetBothSensorParams (0x30AE, &bS1, &bS2);
+					glEp0Buffer[24] = (uint8_t)(bS1 & 0x00FFu);
+					glEp0Buffer[25] = (uint8_t)((bS1 >> 8) & 0x00FFu);
+					glEp0Buffer[26] = (uint8_t)(bS2 & 0x00FFu);
+					glEp0Buffer[27] = (uint8_t)((bS2 >> 8) & 0x00FFu);
+
+					/* 0x30A8 Y_ODD_INC_CB */
+					CyFxGetBothSensorParams (0x30A8, &bS1, &bS2);
+					glEp0Buffer[28] = (uint8_t)(bS1 & 0x00FFu);
+					glEp0Buffer[29] = (uint8_t)((bS1 >> 8) & 0x00FFu);
+					glEp0Buffer[30] = (uint8_t)(bS2 & 0x00FFu);
+					glEp0Buffer[31] = (uint8_t)((bS2 >> 8) & 0x00FFu);
+					CyU3PUsbSendEP0Data (32, glEp0Buffer);
+
+					CyU3PDebugPrint (4, "REPORT_BINNING: 30B0 s1=%d s2=%d | 3008 s1=%d s2=%d | 308E s1=%d s2=%d | 30A2 s1=%d s2=%d\n",
+							((uint16_t)(glEp0Buffer[1]<<8)|glEp0Buffer[0]),
+							((uint16_t)(glEp0Buffer[3]<<8)|glEp0Buffer[2]),
+							((uint16_t)(glEp0Buffer[5]<<8)|glEp0Buffer[4]),
+							((uint16_t)(glEp0Buffer[7]<<8)|glEp0Buffer[6]),
+							((uint16_t)(glEp0Buffer[9]<<8)|glEp0Buffer[8]),
+							((uint16_t)(glEp0Buffer[11]<<8)|glEp0Buffer[10]),
+							((uint16_t)(glEp0Buffer[13]<<8)|glEp0Buffer[12]),
+							((uint16_t)(glEp0Buffer[15]<<8)|glEp0Buffer[14]));
+					CyU3PDebugPrint (4, "REPORT_BINNING: 30A6 s1=%d s2=%d | 3040 s1=%d s2=%d | 30AE s1=%d s2=%d | 30A8 s1=%d s2=%d\n",
+							((uint16_t)(glEp0Buffer[17]<<8)|glEp0Buffer[16]),
+							((uint16_t)(glEp0Buffer[19]<<8)|glEp0Buffer[18]),
+							((uint16_t)(glEp0Buffer[21]<<8)|glEp0Buffer[20]),
+							((uint16_t)(glEp0Buffer[23]<<8)|glEp0Buffer[22]),
+							((uint16_t)(glEp0Buffer[25]<<8)|glEp0Buffer[24]),
+							((uint16_t)(glEp0Buffer[27]<<8)|glEp0Buffer[26]),
+							((uint16_t)(glEp0Buffer[29]<<8)|glEp0Buffer[28]),
+							((uint16_t)(glEp0Buffer[31]<<8)|glEp0Buffer[30]));
+					
+					break;
+				}
+
 				//设置曝光d6
 				case CY_FX_RQT_COMMAND_EXPOSURE:
 				{
@@ -3047,6 +3175,15 @@ CyFxAr0234WritePairAndCommit (uint16_t regAddr, uint16_t regData)
 	CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
 }
 
+static void
+CyFxAr0234WriteIndependentAndCommit (uint16_t regAddr, uint16_t sensor1Data, uint16_t sensor2Data)
+{
+	AR0234_Write_Sensor2 (regAddr, sensor2Data);
+	AR0234_Write_Sensor1 (regAddr, sensor1Data);
+	CyFxSpiProtoWrite8 (0x01, 0x81, 0x11);
+	CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
+}
+
 static CyBool_t
 CyFxVerifyBinningRegPair (uint16_t regAddr, uint16_t expectedData)
 {
@@ -3079,15 +3216,15 @@ CyFxVerifyBinningRegPair (uint16_t regAddr, uint16_t expectedData)
 
 
 static CyBool_t
-CyFxVerifyBinningModeReadback (uint8_t mode)
+CyFxVerifyBinningModeReadback (uint8_t mode, uint16_t s1AXEnd, uint16_t s2AXEnd, uint16_t s1BXEnd, uint16_t s2BXEnd)
 {
 	CyBool_t allPassed = CyTrue;
 
 	if (mode == normal_mode)
 	{
 		if (CyFxVerifyBinningRegPair (0x30B0, 0x0028) == CyFalse) { allPassed = CyFalse; }
-		if (CyFxVerifyBinningRegPair (0x3008, 0x0651) == CyFalse) { allPassed = CyFalse; }
-		if (CyFxVerifyBinningRegPair (0x308E, 0x0651) == CyFalse) { allPassed = CyFalse; }
+		if (CyFxVerifySensorRegPair (0x3008, s1AXEnd, s2AXEnd) == CyFalse) { allPassed = CyFalse; }
+		if (CyFxVerifySensorRegPair (0x308E, s1BXEnd, s2BXEnd) == CyFalse) { allPassed = CyFalse; }
 		if (CyFxVerifyBinningRegPair (0x30A2, 0x0001) == CyFalse) { allPassed = CyFalse; }
 		if (CyFxVerifyBinningRegPair (0x30A6, 0x0001) == CyFalse) { allPassed = CyFalse; }
 		if (CyFxVerifyBinningRegPair (0x3040, 0x0000) == CyFalse) { allPassed = CyFalse; }
@@ -3097,8 +3234,8 @@ CyFxVerifyBinningModeReadback (uint8_t mode)
 	else if (mode == binning_sum)
 	{
 		if (CyFxVerifyBinningRegPair (0x30B0, 0x00A8) == CyFalse) { allPassed = CyFalse; }
-		if (CyFxVerifyBinningRegPair (0x3008, 0x0655) == CyFalse) { allPassed = CyFalse; }
-		if (CyFxVerifyBinningRegPair (0x308E, 0x0655) == CyFalse) { allPassed = CyFalse; }
+		if (CyFxVerifySensorRegPair (0x3008, s1AXEnd, s2AXEnd) == CyFalse) { allPassed = CyFalse; }
+		if (CyFxVerifySensorRegPair (0x308E, s1BXEnd, s2BXEnd) == CyFalse) { allPassed = CyFalse; }
 		if (CyFxVerifyBinningRegPair (0x30A2, 0x0003) == CyFalse) { allPassed = CyFalse; }
 		if (CyFxVerifyBinningRegPair (0x30A6, 0x0003) == CyFalse) { allPassed = CyFalse; }
 		if (CyFxVerifyBinningRegPair (0x3040, 0x3C20) == CyFalse) { allPassed = CyFalse; }
@@ -3108,8 +3245,8 @@ CyFxVerifyBinningModeReadback (uint8_t mode)
 	else if (mode == binning_average)
 	{
 		if (CyFxVerifyBinningRegPair (0x30B0, 0x0028) == CyFalse) { allPassed = CyFalse; }
-		if (CyFxVerifyBinningRegPair (0x3008, 0x0655) == CyFalse) { allPassed = CyFalse; }
-		if (CyFxVerifyBinningRegPair (0x308E, 0x0655) == CyFalse) { allPassed = CyFalse; }
+		if (CyFxVerifySensorRegPair (0x3008, s1AXEnd, s2AXEnd) == CyFalse) { allPassed = CyFalse; }
+		if (CyFxVerifySensorRegPair (0x308E, s1BXEnd, s2BXEnd) == CyFalse) { allPassed = CyFalse; }
 		if (CyFxVerifyBinningRegPair (0x30A2, 0x0003) == CyFalse) { allPassed = CyFalse; }
 		if (CyFxVerifyBinningRegPair (0x30A6, 0x0003) == CyFalse) { allPassed = CyFalse; }
 		if (CyFxVerifyBinningRegPair (0x3040, 0x3C00) == CyFalse) { allPassed = CyFalse; }
@@ -3124,6 +3261,7 @@ CyFxVerifyBinningModeReadback (uint8_t mode)
 
 	return allPassed;
 }
+
 
 static CyBool_t
 CyFxVerifySensorRegPair (uint16_t regAddr, uint16_t expectedSensor1Data, uint16_t expectedSensor2Data)
@@ -3265,44 +3403,44 @@ CyFxVerifyExposureReadback (void)
 }
 
 static CyBool_t
-CyFxWriteBinningModeRegisters (uint8_t mode)
+CyFxWriteBinningModeRegisters (uint8_t mode, uint16_t s1AXEnd, uint16_t s2AXEnd, uint16_t s1BXEnd, uint16_t s2BXEnd)
 {
 	if (mode == normal_mode)
 	{
 		CyFxAr0234WritePairAndCommit (0x30B0, 0x0028);
-		CyFxAr0234WritePairAndCommit (0x3008, 0x0651);
-		CyFxAr0234WritePairAndCommit (0x308E, 0x0651);
 		CyFxAr0234WritePairAndCommit (0x30A2, 0x0001);
 		CyFxAr0234WritePairAndCommit (0x30A6, 0x0001);
 		CyFxAr0234WritePairAndCommit (0x3040, 0x0000);
 		CyFxAr0234WritePairAndCommit (0x30AE, 0x0001);
 		CyFxAr0234WritePairAndCommit (0x30A8, 0x0001);
+		CyFxAr0234WriteIndependentAndCommit (0x3008, s1AXEnd, s2AXEnd);
+		CyFxAr0234WriteIndependentAndCommit (0x308E, s1BXEnd, s2BXEnd);
 		CyFxSpiProtoWrite8 (0x01, 0x86, 0x00);
 		return CyTrue;
 	}
 	else if (mode == binning_sum)
 	{
 		CyFxAr0234WritePairAndCommit (0x30B0, 0x00A8);
-		CyFxAr0234WritePairAndCommit (0x3008, 0x0655);
-		CyFxAr0234WritePairAndCommit (0x308E, 0x0655);
 		CyFxAr0234WritePairAndCommit (0x30A2, 0x0003);
 		CyFxAr0234WritePairAndCommit (0x30A6, 0x0003);
 		CyFxAr0234WritePairAndCommit (0x3040, 0x3C20);
 		CyFxAr0234WritePairAndCommit (0x30AE, 0x0003);
 		CyFxAr0234WritePairAndCommit (0x30A8, 0x0003);
+		CyFxAr0234WriteIndependentAndCommit (0x3008, s1AXEnd, s2AXEnd);
+		CyFxAr0234WriteIndependentAndCommit (0x308E, s1BXEnd, s2BXEnd);
 		CyFxSpiProtoWrite8 (0x01, 0x86, 0x01);
 		return CyTrue;
 	}
 	else if (mode == binning_average)
 	{
 		CyFxAr0234WritePairAndCommit (0x30B0, 0x0028);
-		CyFxAr0234WritePairAndCommit (0x3008, 0x0655);
-		CyFxAr0234WritePairAndCommit (0x308E, 0x0655);
 		CyFxAr0234WritePairAndCommit (0x30A2, 0x0003);
 		CyFxAr0234WritePairAndCommit (0x30A6, 0x0003);
 		CyFxAr0234WritePairAndCommit (0x3040, 0x3C00);
 		CyFxAr0234WritePairAndCommit (0x30AE, 0x0003);
 		CyFxAr0234WritePairAndCommit (0x30A8, 0x0003);
+		CyFxAr0234WriteIndependentAndCommit (0x3008, s1AXEnd, s2AXEnd);
+		CyFxAr0234WriteIndependentAndCommit (0x308E, s1BXEnd, s2BXEnd);
 		CyFxSpiProtoWrite8 (0x01, 0x86, 0x01);
 		return CyTrue;
 	}
@@ -3313,23 +3451,35 @@ CyFxWriteBinningModeRegisters (uint8_t mode)
 static CyBool_t
 CyFxApplyBinningMode (uint8_t mode)
 {
-	if (CyFxWriteBinningModeRegisters (mode) == CyFalse)
+	uint16_t s1AXEnd = AR0234ContextConfig.laserOffsetSensor1_x_end;
+	uint16_t s2AXEnd = AR0234ContextConfig.laserOffsetSensor2_x_end;
+	uint16_t s1BXEnd = AR0234ContextConfig.whiteOffsetSensor1_x_end;
+	uint16_t s2BXEnd = AR0234ContextConfig.whiteOffsetSensor2_x_end;
+	if (mode != normal_mode)
+	{
+		s1AXEnd = (uint16_t)(s1AXEnd + 4u);
+		s2AXEnd = (uint16_t)(s2AXEnd + 4u);
+		s1BXEnd = (uint16_t)(s1BXEnd + 4u);
+		s2BXEnd = (uint16_t)(s2BXEnd + 4u);
+	}
+
+	if (CyFxWriteBinningModeRegisters (mode, s1AXEnd, s2AXEnd, s1BXEnd, s2BXEnd) == CyFalse)
 	{
 		CyU3PDebugPrint (4, "BINNING mode unsupported: %d\n", mode);
 		return CyFalse;
 	}
 
 	CyU3PThreadSleep (CY_FX_BINNING_SETTLE_DELAY_MS);
-	if (CyFxVerifyBinningModeReadback (mode) == CyFalse)
+	if (CyFxVerifyBinningModeReadback (mode, s1AXEnd, s2AXEnd, s1BXEnd, s2BXEnd) == CyFalse)
 	{
 		CyU3PDebugPrint (4, "BINNING readback fail, retrying write, mode=%d\n", mode);
-		if (CyFxWriteBinningModeRegisters (mode) == CyFalse)
+		if (CyFxWriteBinningModeRegisters (mode, s1AXEnd, s2AXEnd, s1BXEnd, s2BXEnd) == CyFalse)
 		{
 			CyU3PDebugPrint (4, "BINNING mode unsupported: %d\n", mode);
 			return CyFalse;
 		}
 		CyU3PThreadSleep (CY_FX_BINNING_SETTLE_DELAY_MS);
-		if (CyFxVerifyBinningModeReadback (mode) == CyFalse)
+		if (CyFxVerifyBinningModeReadback (mode, s1AXEnd, s2AXEnd, s1BXEnd, s2BXEnd) == CyFalse)
 		{
 			CyU3PDebugPrint (4, "BINNING request failed (readback mismatch), mode=%d\n", mode);
 			return CyFalse;

@@ -152,6 +152,7 @@
 #define  REPORT_EXPOSURE                              (0xA6)  //曝光时间上报
 #define  REPORT_GAIN                                  (0xA7)  //增益上报
 #define  REPORT_OFFSET                                (0xA8)  //偏置上报
+#define  REPORT_BINNING_MODE                          (0xA9)  //Binning模式上报
 //B类功能
 #define  CY_FX_RQT_ID_CHECK_FX3                       (0xB0) //查询FX3版本号
 #define  CY_FX_RQT_ID_CHECK_FPGA                      (0xB1) //FPGA版本号
