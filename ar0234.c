@@ -50,6 +50,48 @@ static void AR0234_TxnUnlock(void)
 	}
 }
 
+static void AR0234_LoadSensor1_NoLock(uint16_t regAddr, uint16_t regData)
+{
+	uint8_t registerAddrHigh;
+	uint8_t registerAddrLow;
+	uint8_t registerDataHigh;
+	uint8_t registerDataLow;
+
+	registerAddrHigh = (uint8_t)(regAddr >> 8);
+	registerAddrLow = (uint8_t)regAddr;
+	registerDataHigh = (uint8_t)(regData >> 8);
+	registerDataLow = (uint8_t)regData;
+
+	CyFxSpiProtoWrite8 (0x01, 0x82, registerAddrHigh);
+	CyFxSpiProtoWrite8 (0x01, 0x83, registerAddrLow);
+	CyFxSpiProtoWrite8 (0x01, 0x84, registerDataHigh);
+	CyFxSpiProtoWrite8 (0x01, 0x85, registerDataLow);
+}
+
+static void AR0234_LoadSensor2_NoLock(uint16_t regAddr, uint16_t regData)
+{
+	uint8_t registerAddrHigh;
+	uint8_t registerAddrLow;
+	uint8_t registerDataHigh;
+	uint8_t registerDataLow;
+
+	registerAddrHigh = (uint8_t)(regAddr >> 8);
+	registerAddrLow = (uint8_t)regAddr;
+	registerDataHigh = (uint8_t)(regData >> 8);
+	registerDataLow = (uint8_t)regData;
+
+	CyFxSpiProtoWrite8 (0x01, 0x92, registerAddrHigh);
+	CyFxSpiProtoWrite8 (0x01, 0x93, registerAddrLow);
+	CyFxSpiProtoWrite8 (0x01, 0x94, registerDataHigh);
+	CyFxSpiProtoWrite8 (0x01, 0x95, registerDataLow);
+}
+
+static void AR0234_CommitLoaded_NoLock(uint8_t commitMask)
+{
+	CyFxSpiProtoWrite8 (0x01, 0x81, commitMask);
+	CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
+}
+
 void TemperatureMonitor_Start(void)
 {
 	AR0234_TxnInit();
@@ -114,22 +156,9 @@ CyFxUsbI2cTransfer_AR0234_RD (
 
 void AR0234_Write_Sensor1(uint16_t  regAddr,uint16_t  regData)
 {
-	uint8_t registerAddrHigh,registerAddrLow;
-	uint8_t registerDataHigh,registerDataLow;
-
-	registerAddrHigh = regAddr >> 8;
-	registerAddrLow = regAddr;
-	registerDataHigh = regData >> 8;
-	registerDataLow = regData;
-
 	AR0234_TxnLock();
-	CyFxSpiProtoWrite8 (0x01, 0x82, registerAddrHigh);
-	CyFxSpiProtoWrite8 (0x01, 0x83, registerAddrLow);
-	CyFxSpiProtoWrite8 (0x01, 0x84, registerDataHigh);
-	CyFxSpiProtoWrite8 (0x01, 0x85, registerDataLow);
+	AR0234_LoadSensor1_NoLock(regAddr, regData);
 	AR0234_TxnUnlock();
-//	CyFxSpiProtoWrite8 (0x01, 0x81, 0x01);
-//	CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
 
 	return;
 }
@@ -147,24 +176,45 @@ uint16_t AR0234_read_sensor1(uint16_t  regAddr)
 
 void AR0234_Write_Sensor2(uint16_t  regAddr,uint16_t  regData)
 {
-	uint8_t registerAddrHigh,registerAddrLow;
-	uint8_t registerDataHigh,registerDataLow;
-
-	registerAddrHigh = regAddr >> 8;
-	registerAddrLow = regAddr;
-	registerDataHigh = regData >> 8;
-	registerDataLow = regData;
-
 	AR0234_TxnLock();
-	CyFxSpiProtoWrite8 (0x01, 0x92, registerAddrHigh);
-	CyFxSpiProtoWrite8 (0x01, 0x93, registerAddrLow);
-	CyFxSpiProtoWrite8 (0x01, 0x94, registerDataHigh);
-	CyFxSpiProtoWrite8 (0x01, 0x95, registerDataLow);
+	AR0234_LoadSensor2_NoLock(regAddr, regData);
 	AR0234_TxnUnlock();
-//	CyFxSpiProtoWrite8 (0x01, 0x91, 0x01);
-//	CyFxSpiProtoWrite8 (0x01, 0x91, 0x00);
 
 	return;
+}
+
+void AR0234_Write_Sensor1_Commit(uint16_t regAddr, uint16_t regData)
+{
+	AR0234_TxnLock();
+	AR0234_LoadSensor1_NoLock(regAddr, regData);
+	AR0234_CommitLoaded_NoLock(0x01);
+	AR0234_TxnUnlock();
+}
+
+void AR0234_Write_Sensor2_Commit(uint16_t regAddr, uint16_t regData)
+{
+	AR0234_TxnLock();
+	AR0234_LoadSensor2_NoLock(regAddr, regData);
+	AR0234_CommitLoaded_NoLock(0x10);
+	AR0234_TxnUnlock();
+}
+
+void AR0234_Write_SensorsSame_Commit(uint16_t regAddr, uint16_t regData)
+{
+	AR0234_TxnLock();
+	AR0234_LoadSensor2_NoLock(regAddr, regData);
+	AR0234_LoadSensor1_NoLock(regAddr, regData);
+	AR0234_CommitLoaded_NoLock(0x11);
+	AR0234_TxnUnlock();
+}
+
+void AR0234_Write_SensorsIndependent_Commit(uint16_t regAddr, uint16_t sensor1Data, uint16_t sensor2Data)
+{
+	AR0234_TxnLock();
+	AR0234_LoadSensor2_NoLock(regAddr, sensor2Data);
+	AR0234_LoadSensor1_NoLock(regAddr, sensor1Data);
+	AR0234_CommitLoaded_NoLock(0x11);
+	AR0234_TxnUnlock();
 }
 
 //读取第一路传感器寄存器参数
@@ -228,10 +278,7 @@ void TemperatureSensor_Enable(void)
 {
     // 写入 R0x30B4 [0] = 1 和 R0x30B4 [4] = 1
     // 0x0011 = 0000 0000 0001 0001
-	AR0234_Write_Sensor1(0x30B4, 0x0011);
-	AR0234_Write_Sensor2(0x30B4, 0x0011);
-	CyFxSpiProtoWrite8 (0x01, 0x81, 0x11);
-    CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
+	AR0234_Write_SensorsSame_Commit(0x30B4, 0x0011);
 	#ifdef AR0234_DIAG_DEBUG
 	CyU3PDebugPrint(4, "TEMP sensor-enable\n");
 	#endif
@@ -331,7 +378,9 @@ float TemperatureSensor_CalculateTemperature(uint16_t rawValue, uint16_t calibVa
 void TemperatureSensor_ReadTemperature(float *pTempSensor1, float *pTempSensor2)
 {
     uint16_t rawValue1, rawValue2;
+	#ifdef AR0234_DIAG_DEBUG
 	uint32_t tStart = CyU3PGetTime();
+	#endif
     
 	// 仅首次使能一次温度传感器。
 	if (!glTempSensorEnabled)

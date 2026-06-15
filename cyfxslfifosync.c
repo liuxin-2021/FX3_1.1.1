@@ -2034,16 +2034,13 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
                 case CY_FX_RQT_COMMAND_OPEN_DEVICE:
     				CyFxDeviceInit (glwValue, glwIndex, CyTrue);
     				CyU3PThreadSleep (1000);                     
-                	AR0234_Write_Sensor2(0x3012,AR0234ContextConfig.laserExposureSensor2);
-                	AR0234_Write_Sensor1(0x3012,AR0234ContextConfig.laserExposureSensor1);
+	                	CyFxAr0234WriteIndependentAndCommit (0x3012,
+	                			AR0234ContextConfig.laserExposureSensor1,
+	                			AR0234ContextConfig.laserExposureSensor2);
 
-					CyFxSpiProtoWrite8 (0x01, 0x81, 0x11);
-					CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
-
-                	AR0234_Write_Sensor2(0x3016,AR0234ContextConfig.whiteLightExposureSensor2);
-                	AR0234_Write_Sensor1(0x3016,AR0234ContextConfig.whiteLightExposureSensor1);
-					CyFxSpiProtoWrite8 (0x01, 0x81, 0x11);
-					CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
+	                	CyFxAr0234WriteIndependentAndCommit (0x3016,
+	                			AR0234ContextConfig.whiteLightExposureSensor1,
+	                			AR0234ContextConfig.whiteLightExposureSensor2);
 					CyU3PDebugPrint (4, "shanweiji, laser=%d white=%d\n",
 	                			AR0234ContextConfig.laserExposureSensor1,
 	                		    AR0234ContextConfig.whiteLightExposureSensor1);
@@ -2558,9 +2555,7 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
                 case CY_FX_RQT_COMMAND_SENSOR1:             //SENSOR1 MONO
 
                 	//AR0234_Write_Sensor2(0x3012,AR0234ContextConfig.laserExposureSensor2);
-                	AR0234_Write_Sensor1((uint16_t)(wValue),(uint16_t)(wIndex));
-					CyFxSpiProtoWrite8 (0x01, 0x81, 0x01);
-					CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
+	                AR0234_Write_Sensor1_Commit((uint16_t)(wValue),(uint16_t)(wIndex));
                 	CyU3PThreadSleep (20);
 					CyU3PUsbAckSetup ();
 					break;
@@ -2572,9 +2567,7 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
 					break;
 
                 case CY_FX_RQT_COMMAND_SENSOR2:   // SENSOR2 RGB
-                	AR0234_Write_Sensor2((uint16_t)(wValue),(uint16_t)(wIndex));
-					CyFxSpiProtoWrite8 (0x01, 0x81, 0x10);
-					CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
+	                AR0234_Write_Sensor2_Commit((uint16_t)(wValue),(uint16_t)(wIndex));
 					CyU3PThreadSleep (20);
                 	CyU3PUsbAckSetup ();
 					break;
@@ -3169,19 +3162,13 @@ void slMagneticSwitchAppThread_Entry (uint32_t input)
 static void
 CyFxAr0234WritePairAndCommit (uint16_t regAddr, uint16_t regData)
 {
-	AR0234_Write_Sensor2 (regAddr, regData);
-	AR0234_Write_Sensor1 (regAddr, regData);
-	CyFxSpiProtoWrite8 (0x01, 0x81, 0x11);
-	CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
+	AR0234_Write_SensorsSame_Commit (regAddr, regData);
 }
 
 static void
 CyFxAr0234WriteIndependentAndCommit (uint16_t regAddr, uint16_t sensor1Data, uint16_t sensor2Data)
 {
-	AR0234_Write_Sensor2 (regAddr, sensor2Data);
-	AR0234_Write_Sensor1 (regAddr, sensor1Data);
-	CyFxSpiProtoWrite8 (0x01, 0x81, 0x11);
-	CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
+	AR0234_Write_SensorsIndependent_Commit (regAddr, sensor1Data, sensor2Data);
 }
 
 static CyBool_t
@@ -3297,48 +3284,40 @@ static void
 CyFxApplyOffsetRegisters (void)
 {
 	//y_start//
-	AR0234_Write_Sensor2(0x3002,(uint16_t)(AR0234ContextConfig.laserOffsetSensor2_y_start));
-	AR0234_Write_Sensor1(0x3002,(uint16_t)(AR0234ContextConfig.laserOffsetSensor1_y_start));
-	CyFxSpiProtoWrite8 (0x01, 0x81, 0x11);
-	CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
+	CyFxAr0234WriteIndependentAndCommit (0x3002,
+			AR0234ContextConfig.laserOffsetSensor1_y_start,
+			AR0234ContextConfig.laserOffsetSensor2_y_start);
 
-	AR0234_Write_Sensor2(0x308C,(uint16_t)(AR0234ContextConfig.whiteOffsetSensor2_y_start));
-	AR0234_Write_Sensor1(0x308C,(uint16_t)(AR0234ContextConfig.whiteOffsetSensor1_y_start));
-	CyFxSpiProtoWrite8 (0x01, 0x81, 0x11);
-	CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
+	CyFxAr0234WriteIndependentAndCommit (0x308C,
+			AR0234ContextConfig.whiteOffsetSensor1_y_start,
+			AR0234ContextConfig.whiteOffsetSensor2_y_start);
 
 	//x_start//
-	AR0234_Write_Sensor2(0x3004,(uint16_t)(AR0234ContextConfig.laserOffsetSensor2_x_start));
-	AR0234_Write_Sensor1(0x3004,(uint16_t)(AR0234ContextConfig.laserOffsetSensor1_x_start));
-	CyFxSpiProtoWrite8 (0x01, 0x81, 0x11);
-	CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
+	CyFxAr0234WriteIndependentAndCommit (0x3004,
+			AR0234ContextConfig.laserOffsetSensor1_x_start,
+			AR0234ContextConfig.laserOffsetSensor2_x_start);
 
-	AR0234_Write_Sensor2(0x308A,(uint16_t)(AR0234ContextConfig.whiteOffsetSensor2_x_start));
-	AR0234_Write_Sensor1(0x308A,(uint16_t)(AR0234ContextConfig.whiteOffsetSensor1_x_start));
-	CyFxSpiProtoWrite8 (0x01, 0x81, 0x11);
-	CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
+	CyFxAr0234WriteIndependentAndCommit (0x308A,
+			AR0234ContextConfig.whiteOffsetSensor1_x_start,
+			AR0234ContextConfig.whiteOffsetSensor2_x_start);
 
 	//y_end//
-	AR0234_Write_Sensor2(0x3006,(uint16_t)(AR0234ContextConfig.laserOffsetSensor2_y_end));
-	AR0234_Write_Sensor1(0x3006,(uint16_t)(AR0234ContextConfig.laserOffsetSensor1_y_end));
-	CyFxSpiProtoWrite8 (0x01, 0x81, 0x11);
-	CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
+	CyFxAr0234WriteIndependentAndCommit (0x3006,
+			AR0234ContextConfig.laserOffsetSensor1_y_end,
+			AR0234ContextConfig.laserOffsetSensor2_y_end);
 
-	AR0234_Write_Sensor2(0x3090,(uint16_t)(AR0234ContextConfig.whiteOffsetSensor2_y_end));
-	AR0234_Write_Sensor1(0x3090,(uint16_t)(AR0234ContextConfig.whiteOffsetSensor1_y_end));
-	CyFxSpiProtoWrite8 (0x01, 0x81, 0x11);
-	CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
+	CyFxAr0234WriteIndependentAndCommit (0x3090,
+			AR0234ContextConfig.whiteOffsetSensor1_y_end,
+			AR0234ContextConfig.whiteOffsetSensor2_y_end);
 
 	//x_end//
-	AR0234_Write_Sensor2(0x3008,(uint16_t)(AR0234ContextConfig.laserOffsetSensor2_x_end));
-	AR0234_Write_Sensor1(0x3008,(uint16_t)(AR0234ContextConfig.laserOffsetSensor1_x_end));
-	CyFxSpiProtoWrite8 (0x01, 0x81, 0x11);
-	CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
+	CyFxAr0234WriteIndependentAndCommit (0x3008,
+			AR0234ContextConfig.laserOffsetSensor1_x_end,
+			AR0234ContextConfig.laserOffsetSensor2_x_end);
 
-	AR0234_Write_Sensor2(0x308E,(uint16_t)(AR0234ContextConfig.whiteOffsetSensor2_x_end));
-	AR0234_Write_Sensor1(0x308E,(uint16_t)(AR0234ContextConfig.whiteOffsetSensor1_x_end));
-	CyFxSpiProtoWrite8 (0x01, 0x81, 0x11);
-	CyFxSpiProtoWrite8 (0x01, 0x81, 0x00);
+	CyFxAr0234WriteIndependentAndCommit (0x308E,
+			AR0234ContextConfig.whiteOffsetSensor1_x_end,
+			AR0234ContextConfig.whiteOffsetSensor2_x_end);
 }
 
 static CyBool_t
