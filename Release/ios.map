@@ -9537,33 +9537,33 @@ END GROUP
                 0x40003898                CyFxApplnLPMRqtCB
                 0x40003ee8                slJY901AppThread_Entry
                 0x400040e8                slTempMonitorThread_Entry
-                0x400040fc                gpif_error_cb
-                0x400041bc                CyFxGpioIntrCb
-                0x40004220                CyFxAppErrorHandler
-                0x40004230                CyFxSlFifoApplnDebugInit
-                0x40004378                CyFxUARTDMATransfer
-                0x400043c4                CyFxI2cInit
-                0x40004418                CyFxSlFifoApplnStart
-                0x4000465c                CyFxSlFifoApplnStop
-                0x40004730                CyFxSlFifoApplnUSBEventCB
-                0x400047f8                Current_Init
-                0x40004834                Current_Device_Init
-                0x400049a4                CyFxButtonPressed_Stop
-                0x40004a64                CyFxButtonPressed_Start
-                0x40004b5c                CyFxDeviceInit
-                0x40004df0                CyFxDeviceReConfigure
-                0x40004e54                CyFxSpiInit
-                0x40004f68                CyFxSpiInitCali
-                0x40004fd8                CyFxDeviceReConfigureAll
-                0x40005028                CyFxSpiWaitForStatus
-                0x400050c8                CyFxSpiTransferSector
-                0x4000526c                CyFxUpdate
-                0x400052b4                CyFxSpiFx3Transfer
-                0x4000548c                CyFxGetFPGAVersion
-                0x40005740                CyFxGetFPGA_ANALOG
-                0x400057b0                CyFxGetFPGA_TEMPERATURE
-                0x400058ac                CyFxGetFPGA_VCC
-                0x4000599c                CyFxSlFifoApplnUSBSetupCB
+                0x400041e8                gpif_error_cb
+                0x400042a8                CyFxGpioIntrCb
+                0x4000430c                CyFxAppErrorHandler
+                0x4000431c                CyFxSlFifoApplnDebugInit
+                0x40004464                CyFxUARTDMATransfer
+                0x400044b0                CyFxI2cInit
+                0x40004504                CyFxSlFifoApplnStart
+                0x40004748                CyFxSlFifoApplnStop
+                0x4000481c                CyFxSlFifoApplnUSBEventCB
+                0x400048e4                Current_Init
+                0x40004920                Current_Device_Init
+                0x40004a90                CyFxButtonPressed_Stop
+                0x40004b50                CyFxButtonPressed_Start
+                0x40004c48                CyFxDeviceInit
+                0x40004ed0                CyFxDeviceReConfigure
+                0x40004f34                CyFxSpiInit
+                0x40005048                CyFxSpiInitCali
+                0x400050b8                CyFxDeviceReConfigureAll
+                0x40005108                CyFxSpiWaitForStatus
+                0x400051a8                CyFxSpiTransferSector
+                0x4000534c                CyFxUpdate
+                0x40005394                CyFxSpiFx3Transfer
+                0x4000556c                CyFxGetFPGAVersion
+                0x4000574c                CyFxGetFPGA_ANALOG
+                0x400057bc                CyFxGetFPGA_TEMPERATURE
+                0x400058b8                CyFxGetFPGA_VCC
+                0x400059a8                CyFxSlFifoApplnUSBSetupCB
                 0x400073e0                CyFxSlFifoApplnInit
                 0x400077e0                SlFifoAppThread_Entry
                 0x40007978                slMagneticSwitchAppThread_Entry

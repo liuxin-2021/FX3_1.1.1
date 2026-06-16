@@ -110,6 +110,46 @@ static void CyFxWaitForAr0234InitReady (void);
 CyU3PReturnStatus_t CyFxGetFPGAVersion (uint8_t *data, uint16_t length);
 void CyFxDeviceInit (uint16_t wValue, uint16_t wIndex, CyBool_t powerCycleFpga);
 
+static uint16_t
+CyFxAppendVersionDecimal (uint8_t *data, uint16_t length, uint16_t offset, uint8_t value)
+{
+	if (value < 10u)
+	{
+		if (offset + 1u < length)
+		{
+			data[offset++] = (uint8_t)('0' + value);
+		}
+	}
+	else if (value < 100u)
+	{
+		if (offset + 1u < length)
+		{
+			data[offset++] = (uint8_t)('0' + (value / 10u));
+		}
+		if (offset + 1u < length)
+		{
+			data[offset++] = (uint8_t)('0' + (value % 10u));
+		}
+	}
+	else
+	{
+		if (offset + 1u < length)
+		{
+			data[offset++] = (uint8_t)('0' + (value / 100u));
+		}
+		if (offset + 1u < length)
+		{
+			data[offset++] = (uint8_t)('0' + ((value % 100u) / 10u));
+		}
+		if (offset + 1u < length)
+		{
+			data[offset++] = (uint8_t)('0' + (value % 10u));
+		}
+	}
+
+	return offset;
+}
+
 /* Simplified state management - direct access for better performance and less memory */
 static inline void SetDeviceState(CyBool_t isDeviceRun, CyBool_t isInitialized)
 {
@@ -507,7 +547,7 @@ void CyFxSlFifoApplnStart (void)
 
 	apiRetStatus = CyU3PDmaChannelSetXfer (&glChHandleSlFifoPtoU, CY_FX_SLFIFO_DMA_RX_SIZE);//DMA传输启动
     
-	//这个函数无意义，需要改
+	//这个函数无意义，需要改                                                                                              
 	if (apiRetStatus != CY_U3P_SUCCESS)
 	 {
 		 CyFxAppErrorHandler(apiRetStatus);
@@ -754,14 +794,7 @@ void CyFxDeviceInit (uint16_t wValue, uint16_t wIndex, CyBool_t powerCycleFpga)
 		CyU3PThreadSleep (1000); 
 	}
 
-	if((wValue&0x0c) == 0x0c)
-	{
-		glIsPingpangActive = CyTrue;           //open pingpang
-	}
-	else
-	{
-		glIsPingpangActive = CyFalse;          //close pingpang
-	}
+	glIsPingpangActive = CyTrue;           //open pingpang（恒开，对齐 ios 行为）
 
 	CyU3PGpifSMControl(CyTrue);     // STEP2: 暂停GPIF状态机
 
@@ -1339,7 +1372,7 @@ CyU3PReturnStatus_t CyFxGetFPGAVersion(uint8_t *data, uint16_t length)
 
 	if (offset + 1u < length)
 	{
-		data[offset++] = (highValue < 10u) ? (uint8_t)('0' + highValue) : (uint8_t)'?';
+		offset = CyFxAppendVersionDecimal (data, length, offset, highValue);
 	}
 	if (offset + 1u < length)
 	{
@@ -1347,46 +1380,13 @@ CyU3PReturnStatus_t CyFxGetFPGAVersion(uint8_t *data, uint16_t length)
 	}
 	if (offset + 1u < length)
 	{
-		data[offset++] = (midValue < 10u) ? (uint8_t)('0' + midValue) : (uint8_t)'?';
+		offset = CyFxAppendVersionDecimal (data, length, offset, midValue);
 	}
 	if (offset + 1u < length)
 	{
 		data[offset++] = (uint8_t)'.';
 	}
-
-	if (lowValue < 10u)
-	{
-		if (offset + 1u < length)
-		{
-			data[offset++] = (uint8_t)('0' + lowValue);
-		}
-	}
-	else if (lowValue < 100u)
-	{
-		if (offset + 1u < length)
-		{
-			data[offset++] = (uint8_t)('0' + (lowValue / 10u));
-		}
-		if (offset + 1u < length)
-		{
-			data[offset++] = (uint8_t)('0' + (lowValue % 10u));
-		}
-	}
-	else
-	{
-		if (offset + 1u < length)
-		{
-			data[offset++] = (uint8_t)('0' + (lowValue / 100u));
-		}
-		if (offset + 1u < length)
-		{
-			data[offset++] = (uint8_t)('0' + ((lowValue % 100u) / 10u));
-		}
-		if (offset + 1u < length)
-		{
-			data[offset++] = (uint8_t)('0' + (lowValue % 10u));
-		}
-	}
+	offset = CyFxAppendVersionDecimal (data, length, offset, lowValue);
 
 cleanup:
 	restoreStatus = CyFxSpiProtoWrite8 (0x02, 0xff, 0x00);
@@ -1967,7 +1967,7 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
 					CyFxSpiProtoWrite8 (0x01, 0xab, (uint8_t)(currentData.whiteLightPWM >> 8));
 					CyFxSpiProtoWrite8 (0x01, 0xac, (uint8_t)(currentData.whiteLightPWM));
 					CyU3PUsbAckSetup ();
-					TemperatureMonitor_Start();
+					//TemperatureMonitor_Start();
 					break;
 				}
 				case CY_FX_RQT_GYRO_CONTROL:
@@ -2142,7 +2142,7 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
 						glIsSnapActive = CyFalse;
 						CyU3PGpioSetValue (FX3_SNAP, CyFalse);           // 开始采集信号
 					}
-						CyU3PUsbAckSetup ();
+					CyU3PUsbAckSetup ();
 					break;
                 
                 //设置增益d5
