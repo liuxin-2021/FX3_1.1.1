@@ -311,7 +311,7 @@ CyFxWaitForAr0234InitReady (void)
 	uint16_t s1xEnd = 0u;
 	uint16_t s2xEnd = 0u;
 
-	/* Block here until FPGA version can be read, then offset write+readback succeeds. */
+	
 	for (;;)
 	{
 		CyFxAr0234WritePairAndCommit (0x3002, yStart);
@@ -330,6 +330,12 @@ CyFxWaitForAr0234InitReady (void)
 			(s1xEnd == xEnd) && (s2xEnd == xEnd))
 		{
 			break;
+		}
+		else
+		{
+			CyU3PDebugPrint (4, "CyFxWaitForAr0234InitReady: s1yStart=%d, s2yStart=%d, s1xStart=%d, s2xStart=%d, s1yEnd=%d, s2yEnd=%d, s1xEnd=%d, s2xEnd=%d\n",
+				s1yStart, s2yStart, s1xStart, s2xStart,
+				s1yEnd, s2yEnd, s1xEnd, s2xEnd);
 		}
 	}
 }
@@ -1967,7 +1973,7 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
 					CyFxSpiProtoWrite8 (0x01, 0xab, (uint8_t)(currentData.whiteLightPWM >> 8));
 					CyFxSpiProtoWrite8 (0x01, 0xac, (uint8_t)(currentData.whiteLightPWM));
 					CyU3PUsbAckSetup ();
-					//TemperatureMonitor_Start();
+					TemperatureMonitor_Start();
 					break;
 				}
 				case CY_FX_RQT_GYRO_CONTROL:
@@ -3423,7 +3429,6 @@ CyFxWriteBinningModeRegisters (uint8_t mode, uint16_t s1AXEnd, uint16_t s2AXEnd,
 		CyFxSpiProtoWrite8 (0x01, 0x86, 0x01);
 		return CyTrue;
 	}
-
 	return CyFalse;
 }
 
@@ -3532,18 +3537,26 @@ void slJY901AppThread_Entry(uint32_t input)
         }
         status = JY901_ReadAll();
         if (status == CY_U3P_SUCCESS) {
-            int16_t r = JY901_sReg[JY901_Roll];
-            int16_t p = JY901_sReg[JY901_Pitch];
-            int16_t y = JY901_sReg[JY901_Yaw];
-            float gyroFloats[3];
-            gyroFloats[0] = (float)r * JY901_ANGLE_SCALE;
-            gyroFloats[1] = (float)p * JY901_ANGLE_SCALE;
-            gyroFloats[2] = (float)y * JY901_ANGLE_SCALE;
+            /* 包布局(36字节, little-endian): 前12字节兼容旧版
+             * [0..2]  Roll/Pitch/Yaw (度,  ×ANGLE_SCALE)
+             * [3..5]  AX/AY/AZ       (g,   ×ACCEL_SCALE)
+             * [6..8]  GX/GY/GZ       (°/s, ×GYRO_SCALE)
+             */
+            float outFloats[9];
+            outFloats[0] = (float)JY901_sReg[JY901_Roll]  * JY901_ANGLE_SCALE;
+            outFloats[1] = (float)JY901_sReg[JY901_Pitch] * JY901_ANGLE_SCALE;
+            outFloats[2] = (float)JY901_sReg[JY901_Yaw]   * JY901_ANGLE_SCALE;
+            outFloats[3] = (float)JY901_sReg[JY901_AX]    * JY901_ACCEL_SCALE;
+            outFloats[4] = (float)JY901_sReg[JY901_AY]    * JY901_ACCEL_SCALE;
+            outFloats[5] = (float)JY901_sReg[JY901_AZ]    * JY901_ACCEL_SCALE;
+            outFloats[6] = (float)JY901_sReg[JY901_GX]    * JY901_GYRO_SCALE;
+            outFloats[7] = (float)JY901_sReg[JY901_GY]    * JY901_GYRO_SCALE;
+            outFloats[8] = (float)JY901_sReg[JY901_GZ]    * JY901_GYRO_SCALE;
             readFailCount = 0; backoffMs = 20;
             CyU3PDmaBuffer_t buf_p;
             if (CyU3PDmaChannelGetBuffer(&glChHandleGyro, &buf_p, 10) == CY_U3P_SUCCESS) {
-                CyU3PMemCopy(buf_p.buffer, (uint8_t*)gyroFloats, 12);
-                CyU3PDmaChannelCommitBuffer(&glChHandleGyro, 12, 0);
+                CyU3PMemCopy(buf_p.buffer, (uint8_t*)outFloats, 36);
+                CyU3PDmaChannelCommitBuffer(&glChHandleGyro, 36, 0);
             } else {
                 gyroDmaStarted = CyFalse;
             }
@@ -3716,7 +3729,7 @@ int main (void)
     io_cfg1.useI2S           = CyFalse;
     io_cfg1.useSpi           = CyTrue;
     io_cfg1.lppMode          = CY_U3P_IO_MATRIX_LPP_SPI_ONLY;  /* 设为SPI_ONLY模式 */
-    io_cfg1.gpioSimpleEn[0]  = 0;                              /* GPIO 29/28/23 */
+    io_cfg1.gpioSimpleEn[0]  = 0;                              /* 初始化阶段禁用所有Simple GPIO，仅保留SPI */
     io_cfg1.gpioSimpleEn[1]  = 0;
     io_cfg1.gpioComplexEn[0] = 0;
     io_cfg1.gpioComplexEn[1] = 0;
