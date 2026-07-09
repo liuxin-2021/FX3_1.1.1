@@ -13,7 +13,7 @@
         "cwd": "${workspaceFolder}/Debug",
         "shell": { "executable": "powershell.exe" },
         "env": {
-          "PATH": "C:/Program Files (x86)/Cypress/EZ-USB FX3 SDK/1.3/ARM GCC/bin;${env:PATH}",
+          "PATH": "C:/Program Files (x86)/Cypress/EZ-USB FX3 SDK/1.3/Eclipse/plugins/net.sourceforge.eclipsesdcc.win32_1.0.0/os/win32/x86;C:/Program Files (x86)/Cypress/EZ-USB FX3 SDK/1.3/ARM GCC/bin;${env:PATH}",
           "FX3_SDK": "C:/Program Files (x86)/Cypress/EZ-USB FX3 SDK/1.3"
         }
       },
@@ -34,7 +34,7 @@
         "cwd": "${workspaceFolder}/Debug",
         "shell": { "executable": "powershell.exe" },
         "env": {
-          "PATH": "C:/Program Files (x86)/Cypress/EZ-USB FX3 SDK/1.3/ARM GCC/bin;${env:PATH}",
+          "PATH": "C:/Program Files (x86)/Cypress/EZ-USB FX3 SDK/1.3/Eclipse/plugins/net.sourceforge.eclipsesdcc.win32_1.0.0/os/win32/x86;C:/Program Files (x86)/Cypress/EZ-USB FX3 SDK/1.3/ARM GCC/bin;${env:PATH}",
           "FX3_SDK": "C:/Program Files (x86)/Cypress/EZ-USB FX3 SDK/1.3"
         }
       },
@@ -50,7 +50,7 @@
         "cwd": "${workspaceFolder}/Debug",
         "shell": { "executable": "powershell.exe" },
         "env": {
-          "PATH": "C:/Program Files (x86)/Cypress/EZ-USB FX3 SDK/1.3/ARM GCC/bin;${env:PATH}",
+          "PATH": "C:/Program Files (x86)/Cypress/EZ-USB FX3 SDK/1.3/Eclipse/plugins/net.sourceforge.eclipsesdcc.win32_1.0.0/os/win32/x86;C:/Program Files (x86)/Cypress/EZ-USB FX3 SDK/1.3/ARM GCC/bin;${env:PATH}",
           "FX3_SDK": "C:/Program Files (x86)/Cypress/EZ-USB FX3 SDK/1.3"
         }
       },
@@ -66,7 +66,7 @@
         "cwd": "${workspaceFolder}/Release",
         "shell": { "executable": "powershell.exe" },
         "env": {
-          "PATH": "C:/Program Files (x86)/Cypress/EZ-USB FX3 SDK/1.3/ARM GCC/bin;${env:PATH}",
+          "PATH": "C:/Program Files (x86)/Cypress/EZ-USB FX3 SDK/1.3/Eclipse/plugins/net.sourceforge.eclipsesdcc.win32_1.0.0/os/win32/x86;C:/Program Files (x86)/Cypress/EZ-USB FX3 SDK/1.3/ARM GCC/bin;${env:PATH}",
           "FX3_SDK": "C:/Program Files (x86)/Cypress/EZ-USB FX3 SDK/1.3"
         }
       },
@@ -81,13 +81,13 @@
         "-NoProfile",
         "-ExecutionPolicy", "Bypass",
         "-Command",
-        "make; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; Copy-Item -Force SlaveFifoSync.elf, SlaveFifoSync.img -Destination ../out/"
+        "make; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; Copy-Item -Force ios.elf, ios.img -Destination ../out/"
       ],
       "options": {
         "cwd": "${workspaceFolder}/Release",
         "shell": { "executable": "powershell.exe" },
         "env": {
-          "PATH": "C:/Program Files (x86)/Cypress/EZ-USB FX3 SDK/1.3/ARM GCC/bin;${env:PATH}",
+          "PATH": "C:/Program Files (x86)/Cypress/EZ-USB FX3 SDK/1.3/Eclipse/plugins/net.sourceforge.eclipsesdcc.win32_1.0.0/os/win32/x86;C:/Program Files (x86)/Cypress/EZ-USB FX3 SDK/1.3/ARM GCC/bin;${env:PATH}",
           "FX3_SDK": "C:/Program Files (x86)/Cypress/EZ-USB FX3 SDK/1.3"
         }
       },
@@ -103,7 +103,7 @@
         "cwd": "${workspaceFolder}/Release",
         "shell": { "executable": "powershell.exe" },
         "env": {
-          "PATH": "C:/Program Files (x86)/Cypress/EZ-USB FX3 SDK/1.3/ARM GCC/bin;${env:PATH}",
+          "PATH": "C:/Program Files (x86)/Cypress/EZ-USB FX3 SDK/1.3/Eclipse/plugins/net.sourceforge.eclipsesdcc.win32_1.0.0/os/win32/x86;C:/Program Files (x86)/Cypress/EZ-USB FX3 SDK/1.3/ARM GCC/bin;${env:PATH}",
           "FX3_SDK": "C:/Program Files (x86)/Cypress/EZ-USB FX3 SDK/1.3"
         }
       },

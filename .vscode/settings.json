@@ -1,5 +1,9 @@
 {
     "C_Cpp.errorSquiggles": "disabled",
     "files.encoding": "utf8",
-    "files.autoGuessEncoding": true
+    "files.autoGuessEncoding": true,
+    "clangd.arguments": [
+        "--compile-commands-dir=${workspaceFolder}",
+        "--query-driver=C:/Program Files (x86)/Cypress/EZ-USB FX3 SDK/1.3/ARM GCC/bin/arm-none-eabi-*"
+    ]
 }

@@ -1,0 +1,11 @@
+CompileFlags:
+  CompilationDatabase: .
+  Add:
+    - -D__CYU3P_TX__=1
+    - -I.
+    - -IC:/Program Files (x86)/Cypress/EZ-USB FX3 SDK/1.3/firmware/u3p_firmware/inc
+    - -IC:/Program Files (x86)/Cypress/EZ-USB FX3 SDK/1.3/firmware/common
+    - -xc
+
+Diagnostics:
+  UnusedIncludes: Strict

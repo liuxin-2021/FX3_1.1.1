@@ -15,3 +15,9 @@ Release/ios.map
 Release/JY901.d
 Release/ios.map
 Release/ios.img
+*.idx
+*.bit
+*.o
+*.o
+*.img
+*.map

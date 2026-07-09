@@ -295,6 +295,9 @@ WaitFPGAStable (void)
 }
 #endif
 
+/* AR0234 回读校验总超时（ms）。到期后强制返回就绪，避免因 SPI 读不通死循环。 */
+#define CY_FX_AR0234_INIT_READY_TIMEOUT_MS  (20000u)
+
 static void
 CyFxWaitForAr0234InitReady (void)
 {
@@ -310,8 +313,8 @@ CyFxWaitForAr0234InitReady (void)
 	uint16_t s2yEnd = 0u;
 	uint16_t s1xEnd = 0u;
 	uint16_t s2xEnd = 0u;
+	uint32_t startTime = CyU3PGetTime ();
 
-	
 	for (;;)
 	{
 		CyFxAr0234WritePairAndCommit (0x3002, yStart);
@@ -331,11 +334,16 @@ CyFxWaitForAr0234InitReady (void)
 		{
 			break;
 		}
-		else
-		{
-			CyU3PDebugPrint (4, "CyFxWaitForAr0234InitReady: s1yStart=%d, s2yStart=%d, s1xStart=%d, s2xStart=%d, s1yEnd=%d, s2yEnd=%d, s1xEnd=%d, s2xEnd=%d\n",
+
+		CyU3PDebugPrint (4, "CyFxWaitForAr0234InitReady: s1yStart=%d, s2yStart=%d, s1xStart=%d, s2xStart=%d, s1yEnd=%d, s2yEnd=%d, s1xEnd=%d, s2xEnd=%d\n",
 				s1yStart, s2yStart, s1xStart, s2xStart,
 				s1yEnd, s2yEnd, s1xEnd, s2xEnd);
+
+		if ((CyU3PGetTime () - startTime) >= CY_FX_AR0234_INIT_READY_TIMEOUT_MS)
+		{
+			CyU3PDebugPrint (4, "CyFxWaitForAr0234InitReady: timeout after %d ms, force ready.\n",
+					(int)CY_FX_AR0234_INIT_READY_TIMEOUT_MS);
+			break;
 		}
 	}
 }
@@ -1331,7 +1339,7 @@ CyFxSpiFx3Transfer (
 }
 
 
-CyU3PReturnStatus_t CyFxGetFPGAVersion(uint8_t *data, uint16_t length)
+CyU3PReturnStatus_t  CyFxGetFPGAVersion(uint8_t *data, uint16_t length)
 {
 	static const char versionPrefix[] = "FPGA_V";
 	static const char errorString[] = "FPGA_VERR";
@@ -1589,11 +1597,11 @@ CyBool_t CyFxSlFifoApplnUSBSetupCB (uint32_t setupdat0, uint32_t setupdat1)
     //上位机控制指令处理流程
     if (bType == CY_U3P_USB_VENDOR_RQT)
     {
-			/* 在初始化完成前，统一拒绝所有 Vendor 指令（返回 STALL）。 */
-			if (!CyFxDeviceIsReady ())
-			{
-				return CyFalse;
-			}
+            /* 初始化完成前，仅响应 FX3 版本号查询，其余 Vendor 指令一律拒绝（返回 STALL）。 */
+            if (!CyFxDeviceIsReady () && (bRequest != CY_FX_RQT_ID_CHECK_FX3))
+            {
+                return CyFalse;
+            }
 
             isHandled = CyTrue;
 
@@ -3492,6 +3500,8 @@ void slJY901AppThread_Entry(uint32_t input)
     CyBool_t gyroDmaStarted = CyFalse;
     uint32_t readFailCount = 0;
     uint32_t backoffMs = 20;
+	uint32_t initRetryCount = 0;
+	uint32_t recoveryInitRetryCount = 0;
 
     CyU3PDebugPrint(4, "JY901 Thread Started, waiting for I2C init...\r\n");
 
@@ -3509,16 +3519,24 @@ void slJY901AppThread_Entry(uint32_t input)
     } 
     CyU3PDebugPrint(4, "JY901: I2C init confirmed, proceeding...\r\n");
 
-    for (;;) {
-        status = JY901_Init();
-        if (status == CY_U3P_SUCCESS) break;
-        CyU3PDebugPrint(4, "JY901_Init failed: %d, retry\r\n", status);
-        CyU3PThreadSleep(1000);
-    }
+	for (;;) {
+		status = JY901_Init();
+		if (status == CY_U3P_SUCCESS) break;
+
+		initRetryCount++;
+		if (initRetryCount >= 3) {
+			CyU3PDebugPrint(4, "JY901_Init failed: %d, give up after %d tries\r\n", status, initRetryCount);
+			return;
+		}
+
+		CyU3PDebugPrint(4, "JY901_Init failed: %d, retry %d/3\r\n", status, initRetryCount);
+		CyU3PThreadSleep(1000);
+	}
 
     for (;;) {
         if (gJY901Enabled == CyFalse) {
-            readFailCount = 0; backoffMs = 20;
+			readFailCount = 0; backoffMs = 20;
+			recoveryInitRetryCount = 0;
             CyU3PThreadSleep(200);
             continue;
         }
@@ -3552,7 +3570,8 @@ void slJY901AppThread_Entry(uint32_t input)
             outFloats[6] = (float)JY901_sReg[JY901_GX]    * JY901_GYRO_SCALE;
             outFloats[7] = (float)JY901_sReg[JY901_GY]    * JY901_GYRO_SCALE;
             outFloats[8] = (float)JY901_sReg[JY901_GZ]    * JY901_GYRO_SCALE;
-            readFailCount = 0; backoffMs = 20;
+			readFailCount = 0; backoffMs = 20;
+			recoveryInitRetryCount = 0;
             CyU3PDmaBuffer_t buf_p;
             if (CyU3PDmaChannelGetBuffer(&glChHandleGyro, &buf_p, 10) == CY_U3P_SUCCESS) {
                 CyU3PMemCopy(buf_p.buffer, (uint8_t*)outFloats, 36);
@@ -3564,9 +3583,24 @@ void slJY901AppThread_Entry(uint32_t input)
             readFailCount++;
             if (readFailCount >= 50) {
                 gyroDmaStarted = CyFalse;
-                JY901_Init();
+				status = JY901_Init();
                 readFailCount = 0;
-                backoffMs = 500;
+				if (status == CY_U3P_SUCCESS) {
+					recoveryInitRetryCount = 0;
+					backoffMs = 20;
+				} else {
+					recoveryInitRetryCount++;
+					backoffMs = 500;
+
+					if (recoveryInitRetryCount >= 3) {
+						gJY901Enabled = CyFalse;
+						CyU3PUsbFlushEp(CY_FX_EP_GYRO_IN);
+						CyU3PDmaChannelReset(&glChHandleGyro);
+						CyU3PDebugPrint(4, "JY901 re-init failed: %d, disable stream after %d tries\r\n", status, recoveryInitRetryCount);
+					} else {
+						CyU3PDebugPrint(4, "JY901 re-init failed: %d, retry %d/3\r\n", status, recoveryInitRetryCount);
+					}
+				}
             } else if (readFailCount >= 5) {
                 backoffMs = 100;
             }
