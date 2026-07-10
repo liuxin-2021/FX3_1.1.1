@@ -109,6 +109,8 @@
 #define FPGA_PWR_EN             (23)
 #define FX3_DEVICE_RESET        (52) 
 #define FX3_SNAP                (60) 
+/* FPGA 程序加载控制脚：FPGA 上电前必须拉低，持续到 FPGA/AR0234 初始化就绪后再释放为高阻。 */
+#define FPGA_PROG_CTRL          (28) 
 
 
 

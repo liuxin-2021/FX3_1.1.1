@@ -858,6 +858,19 @@ void CyFxDeviceInit (uint16_t wValue, uint16_t wIndex, CyBool_t powerCycleFpga)
 	glIsDeviceRun = CyFalse;
 	glIsCapMode   = CyTrue;    //标定模式or扫描模式与这个全局变量相关；
 	CyFxWaitForAr0234InitReady ();
+
+	/* FPGA/AR0234 初始化已就绪：将 FPGA_PROG_CTRL (GPIO28) 释放为高阻输入，
+	 * 之后该脚不再由 FX3 主动驱动，电平由 PCB 外部电路决定。 */
+	
+	CyU3PGpioSimpleConfig_t progReleaseCfg;
+	CyU3PMemSet ((uint8_t *)&progReleaseCfg, 0, sizeof(progReleaseCfg));
+	progReleaseCfg.outValue    = CyFalse;
+	progReleaseCfg.inputEn     = CyTrue;
+	progReleaseCfg.driveLowEn  = CyFalse;
+	progReleaseCfg.driveHighEn = CyFalse;
+	progReleaseCfg.intrMode    = CY_U3P_GPIO_NO_INTR;
+	(void)CyU3PGpioSetSimpleConfig (FPGA_PROG_CTRL, &progReleaseCfg);
+	
 	CyFxUpdateDeviceReadyState (CY_FX_DEVICE_READY_READY);
 	glInResume = CyFalse;
 }
@@ -2808,6 +2821,17 @@ void CyFxSlFifoApplnInit (void)
 	 gpioClock.halfDiv = 0;
     
 	 apiRetStatus = CyU3PGpioInit(&gpioClock, CyFxGpioIntrCb);  // 注册中断回调，引脚发生变化时调用
+
+	/* FPGA 程序加载控制脚 (GPIO28)：必须先于 FPGA_PWR_EN 完成配置并输出低电平，
+	 * 以保证 FPGA 上电瞬间该脚就已经被拉低，直到 AR0234/FPGA 初始化完成后再释放。 */
+	apiRetStatus = CyU3PDeviceGpioOverride (FPGA_PROG_CTRL, CyTrue);
+	gpioConfig.inputEn     = CyFalse;
+	gpioConfig.driveLowEn  = CyTrue;
+	gpioConfig.driveHighEn = CyTrue;
+	gpioConfig.intrMode    = CY_U3P_GPIO_NO_INTR;
+	gpioConfig.outValue    = CyFalse;
+	apiRetStatus = CyU3PGpioSetSimpleConfig (FPGA_PROG_CTRL, &gpioConfig);
+
 	apiRetStatus = CyU3PDeviceGpioOverride (FPGA_PWR_EN, CyTrue);// FPGA电源控制
 
 	/* Configure GPIO as output with deterministic initial levels. */
@@ -3837,7 +3861,7 @@ int main (void)
 #endif
 
     /* 启用GPIO引脚 */
-    io_cfg.gpioSimpleEn[0]  = 0x08800000;   /* GPIO 27/23 */
+    io_cfg.gpioSimpleEn[0]  = 0x18800000;   /* GPIO 28/27/23 */
 	io_cfg.gpioSimpleEn[1]  = CY_FX_RUNTIME_GPIO_SIMPLE_EN1;   /* GPIO 60/57/52/51/50/45 */
     /*
      * GPIO60: FX3_SNAP          - 快照控制
@@ -3846,7 +3870,9 @@ int main (void)
      * GPIO51: FX3_GPIO_HALL     - 磁吸霍尔传感器输入（双沿中断）
      * GPIO50: FX3_SPI_SS_FPGA  - FPGA SPI片选
      * GPIO45: 按钮输入          - 按键1输入
-     * GPIO23: 按键开关输入       - 电源/按键切换
+     * GPIO28: FPGA_PROG_CTRL   - FPGA程序加载控制（上电前拉低，初始化就绪后释放）
+     * GPIO27: BUTTON           - 主按键（下降沿中断+弱上拉）
+     * GPIO23: FPGA_PWR_EN      - FPGA电源使能
      */
     io_cfg.gpioComplexEn[0] = 0;
     io_cfg.gpioComplexEn[1] = 0;
