@@ -21,3 +21,10 @@ Release/ios.img
 *.o
 *.img
 *.map
+*.d
+docs/M1_FX3.pdf
+docs/fx3_init_flow.md
+out/ios.elf
+Release/cyfxslfifosync.o
+Release/ios.img
+Release/ios.map

@@ -598,7 +598,7 @@ void CyFxSlFifoApplnStart (void)
 	}
 
 	/* Keep FPGA in reset until USB endpoints and DMA paths are ready. */
-	CyU3PGpioSetValue (FX3_DEVICE_RESET, CyTrue);
+	// CyU3PGpioSetValue (FX3_DEVICE_RESET, CyTrue);
 	CyU3PThreadSleep (50);
 	SetFpgaPoweredReady(CyTrue);
 
@@ -724,7 +724,7 @@ void CyFxButtonPressed_Stop(void)
 	CyU3PGpioSetValue (FX3_SNAP, CyTrue);          //RESET FIFO&STATE MACHINE
 	CyFxSpiProtoWrite8 (0x01, 0x11, 0x01);        // RESET pingpang working
 	CyU3PThreadSleep (10);
-	CyU3PGpioSetValue (FX3_DEVICE_RESET, CyFalse); //reset FPGA
+	// CyU3PGpioSetValue (FX3_DEVICE_RESET, CyFalse); //reset FPGA
 	CyU3PThreadSleep (50);
 	SetFpgaPoweredReady(CyFalse);
 
@@ -762,7 +762,7 @@ void CyFxButtonPressed_Start(void)
 	CyU3PGpioSetValue (FX3_SNAP, CyTrue);          //RESET FIFO&STATE MACHINE
 	CyFxSpiProtoWrite8 (0x01, 0x11, 0x01);        // RESET pingpang working
 	CyU3PThreadSleep (10);
-	CyU3PGpioSetValue (FX3_DEVICE_RESET, CyTrue);  //FPGA starts working
+	// CyU3PGpioSetValue (FX3_DEVICE_RESET, CyTrue);  //FPGA starts working
 	CyU3PThreadSleep (50);
 	SetFpgaPoweredReady(CyTrue);
 
@@ -819,10 +819,10 @@ void CyFxDeviceInit (uint16_t wValue, uint16_t wIndex, CyBool_t powerCycleFpga)
   
 	if (powerCycleFpga)
 	{
-		CyU3PGpioSetValue (FX3_DEVICE_RESET, CyFalse); //reset FPGA(SPI module still works)
+		// CyU3PGpioSetValue (FX3_DEVICE_RESET, CyFalse); //reset FPGA(SPI module still works)
 		CyU3PThreadSleep (100);
 	}
-	CyU3PGpioSetValue (FX3_DEVICE_RESET, CyTrue);  // release reset, FPGA starts working
+	// CyU3PGpioSetValue (FX3_DEVICE_RESET, CyTrue);  // release reset, FPGA starts working
 	SetFpgaPoweredReady(CyTrue);
 	if (powerCycleFpga)
 	{
@@ -2842,8 +2842,8 @@ void CyFxSlFifoApplnInit (void)
 	/* 电源与状态脚默认高；reset脚默认低，避免输出使能瞬间出现释放复位毛刺。 */
 	gpioConfig.outValue = CyTrue;
 	apiRetStatus = CyU3PGpioSetSimpleConfig(FPGA_PWR_EN, &gpioConfig);
-	gpioConfig.outValue = CyFalse;
-	apiRetStatus = CyU3PGpioSetSimpleConfig (FX3_DEVICE_RESET, &gpioConfig);
+	// gpioConfig.outValue = CyFalse;
+	// apiRetStatus = CyU3PGpioSetSimpleConfig (FX3_DEVICE_RESET, &gpioConfig);
 	gpioConfig.outValue = CyTrue;
 	apiRetStatus = CyU3PGpioSetSimpleConfig (FX3_SNAP, &gpioConfig);
 
@@ -2871,7 +2871,7 @@ void CyFxSlFifoApplnInit (void)
 		(void)CyU3PGpioSetIoMode(BUTTON, CY_U3P_GPIO_IO_MODE_WPU); // weak pull-up
 	}
 
-	CyU3PGpioSetValue (FX3_DEVICE_RESET, CyFalse);   // FPGA复位保持(低)
+	// CyU3PGpioSetValue (FX3_DEVICE_RESET, CyFalse);   // FPGA复位保持(低)
 	CyU3PGpioSetValue (FX3_SNAP, CyTrue);            // 复位FIFO状态机
 
 	if (gSpiStandaloneInited == CyFalse)
@@ -3041,7 +3041,7 @@ void CyFxSlFifoApplnInit (void)
         CyFxAppErrorHandler(apiRetStatus);
     }
 	/* Delay FPGA reset release until SETCONF has built DMA/EP data paths. */
-	CyU3PGpioSetValue (FX3_DEVICE_RESET, CyFalse);
+	// CyU3PGpioSetValue (FX3_DEVICE_RESET, CyFalse);
 	SetFpgaPoweredReady(CyFalse);
 
      // 11. 连接USB
