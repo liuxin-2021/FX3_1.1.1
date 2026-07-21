@@ -28,3 +28,4 @@ out/ios.elf
 Release/cyfxslfifosync.o
 Release/ios.img
 Release/ios.map
+*.md

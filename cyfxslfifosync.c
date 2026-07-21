@@ -597,8 +597,8 @@ void CyFxSlFifoApplnStart (void)
 		CyFxAppErrorHandler(apiRetStatus);
 	}
 
-	/* Keep FPGA in reset until USB endpoints and DMA paths are ready. */
-	// CyU3PGpioSetValue (FX3_DEVICE_RESET, CyTrue);
+	/* FPGA 上电+加载完成后已在 ApplnInit 中等待过, 这里再留 50 ms 让 EP/DMA 稳定.
+	 * (原设计通过 FX3_DEVICE_RESET 复位 FPGA, 但该 GPIO 未连 FPGA, 逻辑已作废.) */
 	CyU3PThreadSleep (50);
 	SetFpgaPoweredReady(CyTrue);
 
@@ -723,8 +723,7 @@ void CyFxButtonPressed_Stop(void)
 	//CyU3PThreadSleep (10);
 	CyU3PGpioSetValue (FX3_SNAP, CyTrue);          //RESET FIFO&STATE MACHINE
 	CyFxSpiProtoWrite8 (0x01, 0x11, 0x01);        // RESET pingpang working
-	CyU3PThreadSleep (10);
-	// CyU3PGpioSetValue (FX3_DEVICE_RESET, CyFalse); //reset FPGA
+
 	CyU3PThreadSleep (50);
 	SetFpgaPoweredReady(CyFalse);
 
@@ -761,8 +760,7 @@ void CyFxButtonPressed_Start(void)
 	}
 	CyU3PGpioSetValue (FX3_SNAP, CyTrue);          //RESET FIFO&STATE MACHINE
 	CyFxSpiProtoWrite8 (0x01, 0x11, 0x01);        // RESET pingpang working
-	CyU3PThreadSleep (10);
-	// CyU3PGpioSetValue (FX3_DEVICE_RESET, CyTrue);  //FPGA starts working
+
 	CyU3PThreadSleep (50);
 	SetFpgaPoweredReady(CyTrue);
 
@@ -819,10 +817,8 @@ void CyFxDeviceInit (uint16_t wValue, uint16_t wIndex, CyBool_t powerCycleFpga)
   
 	if (powerCycleFpga)
 	{
-		// CyU3PGpioSetValue (FX3_DEVICE_RESET, CyFalse); //reset FPGA(SPI module still works)
 		CyU3PThreadSleep (100);
 	}
-	// CyU3PGpioSetValue (FX3_DEVICE_RESET, CyTrue);  // release reset, FPGA starts working
 	SetFpgaPoweredReady(CyTrue);
 	if (powerCycleFpga)
 	{
@@ -859,18 +855,11 @@ void CyFxDeviceInit (uint16_t wValue, uint16_t wIndex, CyBool_t powerCycleFpga)
 	glIsCapMode   = CyTrue;    //标定模式or扫描模式与这个全局变量相关；
 	CyFxWaitForAr0234InitReady ();
 
-	/* FPGA/AR0234 初始化已就绪：将 FPGA_PROG_CTRL (GPIO28) 释放为高阻输入，
-	 * 之后该脚不再由 FX3 主动驱动，电平由 PCB 外部电路决定。 */
-	
-	CyU3PGpioSimpleConfig_t progReleaseCfg;
-	CyU3PMemSet ((uint8_t *)&progReleaseCfg, 0, sizeof(progReleaseCfg));
-	progReleaseCfg.outValue    = CyFalse;
-	progReleaseCfg.inputEn     = CyTrue;
-	progReleaseCfg.driveLowEn  = CyFalse;
-	progReleaseCfg.driveHighEn = CyFalse;
-	progReleaseCfg.intrMode    = CY_U3P_GPIO_NO_INTR;
-	(void)CyU3PGpioSetSimpleConfig (FPGA_PROG_CTRL, &progReleaseCfg);
-	
+	/* 注意: 不再将 FX3_ISP_ENABLE (GPIO28 = FX3_A1) 释放为 Hi-Z.
+	 * 该脚全程保持推挽输出 0, 锁定 U8 通道1 断开, 使 FPGA 独占 U5 QSPI.
+	 * 只有在启动"FX3 在线更新 U5"流程时才应临时驱动为 1 让 U8 通道1 导通,
+	 * 更新完成后立即恢复为 0. */
+
 	CyFxUpdateDeviceReadyState (CY_FX_DEVICE_READY_READY);
 	glInResume = CyFalse;
 }
@@ -2799,53 +2788,65 @@ void CyFxSlFifoApplnInit (void)
     pibClock.isHalfDiv = CyFalse;
     /* Disable DLL for sync GPIF */
     pibClock.isDllEnable = CyFalse;
-	// 初始化P-Port接口
-    CyU3PPibInit(CyTrue, &pibClock);
- 
-    // 3. 加载GPIF配置
-    CyU3PGpifLoad (&CyFxGpifConfig);
 
-     // 4. 配置GPIF Socket 3用于控制通道
-     apiRetStatus = CyU3PGpifSocketConfigure(3, CY_U3P_PIB_SOCKET_3, 6, CyFalse, 1);
-     if (apiRetStatus != CY_U3P_SUCCESS)
-     {
-         CyU3PDebugPrint(4, "GPIF Socket configure failed, Error Code = %d\n", apiRetStatus);
-         CyFxAppErrorHandler(apiRetStatus);
-     }
+	/* ---------------------------------------------------------------
+	 * 顺序说明（防止 FPGA 从 U5 加载配置期间被 FX3 干扰）:
+	 *   1) 先初始化 GPIO block, 用 GpioOverride 把 GPIO28 抢占为 Simple GPIO
+	 *      并强制输出 0, 避免后续 32-bit GPIF 把 GPIO28 复用为 FX3_D28 时
+	 *      让 FX3_A1 电平失控 (FX3_A1=1 会让 U8 通道1 导通, FX3 SPI 与 U5
+	 *      QSPI 总线短接, 破坏 FPGA 加载).
+	 *   2) 同步锁 FPGA_PWR_EN=0, 保证 FPGA 在 GPIF 波形加载完成前不上电.
+	 *   3) 完成 PibInit + GpifLoad + GpifSocketConfigure (状态机不启动).
+	 *   4) 释放 FPGA_PWR_EN=1, FPGA 开始从 U5 加载 bit.
+	 *   5) Sleep 300 ms 等 Artix-7 XC7A35T 加载完成 (典型 100-200 ms).
+	 *   6) 最后启动 GPIF 状态机 (此时 FPGA 已就绪, GPIF 波形不会影响加载).
+	 * ------------------------------------------------------------- */
 
-	 // 5. GPIO初始化
-	 gpioClock.fastClkDiv = 2;
-	 gpioClock.slowClkDiv = 0;
-	 gpioClock.simpleDiv = CY_U3P_GPIO_SIMPLE_DIV_BY_2;
-	 gpioClock.clkSrc = CY_U3P_SYS_CLK;
-	 gpioClock.halfDiv = 0;
-    
-	 apiRetStatus = CyU3PGpioInit(&gpioClock, CyFxGpioIntrCb);  // 注册中断回调，引脚发生变化时调用
+	/* Step 1: GPIO block 初始化 */
+	gpioClock.fastClkDiv = 2;
+	gpioClock.slowClkDiv = 0;
+	gpioClock.simpleDiv  = CY_U3P_GPIO_SIMPLE_DIV_BY_2;
+	gpioClock.clkSrc     = CY_U3P_SYS_CLK;
+	gpioClock.halfDiv    = 0;
+	apiRetStatus = CyU3PGpioInit(&gpioClock, CyFxGpioIntrCb);
 
-	/* FPGA 程序加载控制脚 (GPIO28)：必须先于 FPGA_PWR_EN 完成配置并输出低电平，
-	 * 以保证 FPGA 上电瞬间该脚就已经被拉低，直到 AR0234/FPGA 初始化完成后再释放。 */
-	apiRetStatus = CyU3PDeviceGpioOverride (FPGA_PROG_CTRL, CyTrue);
+	/* Step 1a: 抢占 GPIO28 (FX3_A1 = FX3_ISP_ENABLE), 强制输出 0.
+	 * 硬件: FX3_A1 -> U7(1A->1Y反相) -> U8.1OE. FX3_A1=0 -> U8.1OE=1 -> 通道1 断开,
+	 * FPGA 独占 U5 QSPI. R2=4.7k 已下拉到 0 做保底, 这里再用强推挽驱动 0 双保险,
+	 * 同时把 pad 从 GPIF 数据域抢过来, 防止 GPIF 状态机启动后随波形翻转. */
+	apiRetStatus = CyU3PDeviceGpioOverride (FX3_ISP_ENABLE, CyTrue);
 	gpioConfig.inputEn     = CyFalse;
 	gpioConfig.driveLowEn  = CyTrue;
 	gpioConfig.driveHighEn = CyTrue;
 	gpioConfig.intrMode    = CY_U3P_GPIO_NO_INTR;
 	gpioConfig.outValue    = CyFalse;
-	apiRetStatus = CyU3PGpioSetSimpleConfig (FPGA_PROG_CTRL, &gpioConfig);
+	apiRetStatus = CyU3PGpioSetSimpleConfig (FX3_ISP_ENABLE, &gpioConfig);
 
-	apiRetStatus = CyU3PDeviceGpioOverride (FPGA_PWR_EN, CyTrue);// FPGA电源控制
-
-	/* Configure GPIO as output with deterministic initial levels. */
-    gpioConfig.inputEn = CyFalse;        // 禁用输入
-    gpioConfig.driveLowEn = CyTrue;      // 使能低电平驱动
-    gpioConfig.driveHighEn = CyTrue;     // 使能高电平驱动
-    gpioConfig.intrMode = CY_U3P_GPIO_NO_INTR; // 无中断
-	/* 电源与状态脚默认高；reset脚默认低，避免输出使能瞬间出现释放复位毛刺。 */
-	gpioConfig.outValue = CyTrue;
+	/* Step 1b: 抢占 FPGA_PWR_EN (GPIO23), 先输出 0 保持 FPGA 断电.
+	 * 稍后 GPIF 加载完成后再拉高上电. */
+	apiRetStatus = CyU3PDeviceGpioOverride (FPGA_PWR_EN, CyTrue);
+	gpioConfig.outValue = CyFalse;
 	apiRetStatus = CyU3PGpioSetSimpleConfig(FPGA_PWR_EN, &gpioConfig);
-	// gpioConfig.outValue = CyFalse;
-	// apiRetStatus = CyU3PGpioSetSimpleConfig (FX3_DEVICE_RESET, &gpioConfig);
+
+	/* Step 2: P-Port 时钟起来 + 加载 GPIF 波形 (状态机不启动) */
+	CyU3PPibInit(CyTrue, &pibClock);
+	CyU3PGpifLoad (&CyFxGpifConfig);
+
+	/* Step 3: 配置 GPIF Socket 3 用于控制通道 */
+	apiRetStatus = CyU3PGpifSocketConfigure(3, CY_U3P_PIB_SOCKET_3, 6, CyFalse, 1);
+	if (apiRetStatus != CY_U3P_SUCCESS)
+	{
+		CyU3PDebugPrint(4, "GPIF Socket configure failed, Error Code = %d\n", apiRetStatus);
+		CyFxAppErrorHandler(apiRetStatus);
+	}
+
+	/* 配置 FX3_SNAP 输出高 (复位 FIFO 状态机, 与后续业务无冲突) */
 	gpioConfig.outValue = CyTrue;
 	apiRetStatus = CyU3PGpioSetSimpleConfig (FX3_SNAP, &gpioConfig);
+
+	/* Step 4: FPGA 上电, 开始从 U5 加载 bit */
+	gpioConfig.outValue = CyTrue;
+	apiRetStatus = CyU3PGpioSetSimpleConfig(FPGA_PWR_EN, &gpioConfig);
 
 	  // 配置输入GPIO（按钮）
 	gpioConfig.outValue    = CyFalse;
@@ -2871,7 +2872,6 @@ void CyFxSlFifoApplnInit (void)
 		(void)CyU3PGpioSetIoMode(BUTTON, CY_U3P_GPIO_IO_MODE_WPU); // weak pull-up
 	}
 
-	// CyU3PGpioSetValue (FX3_DEVICE_RESET, CyFalse);   // FPGA复位保持(低)
 	CyU3PGpioSetValue (FX3_SNAP, CyTrue);            // 复位FIFO状态机
 
 	if (gSpiStandaloneInited == CyFalse)
@@ -2901,7 +2901,15 @@ void CyFxSlFifoApplnInit (void)
 	/* 在启动 GPIF 状态机前注册错误回调，避免早期错误被吞掉。 */
 	CyU3PPibRegisterCallback (gpif_error_cb, 0xffff);
 
-	/* GPIO 已经进入安全态后，再启动 GPIF 状态机。 */
+	/* Step 5: 等 FPGA 完成从 U5 QSPI 加载 bit.
+	 * Artix-7 XC7A35T 典型加载时间 100-200 ms, 这里留 300 ms 余量.
+	 * 在 FPGA 就绪前启动 GPIF 状态机会让 32-bit GPIF 数据线随波形翻转,
+	 * 其中 FX3_D28 与 FX3_A1 复用, 一旦 FX3_A1 意外拉高会让 U8 通道1 导通,
+	 * FX3 SPI 与 U5 QSPI 冲撞. 尽管 GPIO override 应能压住此复用, 但延时
+	 * 到 FPGA 加载完成后再启动 GPIF 作为额外保险. */
+	CyU3PThreadSleep (300);
+
+	/* Step 6: GPIO 已进入安全态且 FPGA 已加载完成, 启动 GPIF 状态机 */
 	apiRetStatus = CyU3PGpifSMStart (RESET, ALPHA_RESET);
 	if (apiRetStatus != CY_U3P_SUCCESS)
 	{
@@ -3040,8 +3048,7 @@ void CyFxSlFifoApplnInit (void)
 		#endif
         CyFxAppErrorHandler(apiRetStatus);
     }
-	/* Delay FPGA reset release until SETCONF has built DMA/EP data paths. */
-	// CyU3PGpioSetValue (FX3_DEVICE_RESET, CyFalse);
+	/* Standby state until USB SETCONF: EP/DMA 通路建立完成前, 业务保持 not-ready. */
 	SetFpgaPoweredReady(CyFalse);
 
      // 11. 连接USB
@@ -3866,11 +3873,12 @@ int main (void)
     /*
      * GPIO60: FX3_SNAP          - 快照控制
      * GPIO57: HALL 输入/输出     - 霍尔传感器/按键2
-     * GPIO52: 设备复位          - FPGA复位信号
+     * GPIO52: FX3_DEVICE_RESET - 仅接 TP7 测试点, 未连 FPGA (历史保留, 不驱动 FPGA 任何功能)
      * GPIO51: FX3_GPIO_HALL     - 磁吸霍尔传感器输入（双沿中断）
      * GPIO50: FX3_SPI_SS_FPGA  - FPGA SPI片选
      * GPIO45: 按钮输入          - 按键1输入
-     * GPIO28: FPGA_PROG_CTRL   - FPGA程序加载控制（上电前拉低，初始化就绪后释放）
+     * GPIO28: FX3_ISP_ENABLE   - U8 通道1 (FX3-SPI<->U5 QSPI) 使能反相输入,
+     *                             全程锁 0 保证 FPGA 独占 U5, 仅在线烧写 U5 时临时拉 1
      * GPIO27: BUTTON           - 主按键（下降沿中断+弱上拉）
      * GPIO23: FPGA_PWR_EN      - FPGA电源使能
      */

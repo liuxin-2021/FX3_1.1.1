@@ -107,10 +107,13 @@
 #define FX3_GPIO_HALL           (51) /* GPIO Id 51 will be used as hall sensor */
 //  ------------- GPIO(OUTPUT) --------------
 #define FPGA_PWR_EN             (23)
-#define FX3_DEVICE_RESET        (52) 
-#define FX3_SNAP                (60) 
-/* FPGA 程序加载控制脚：FPGA 上电前必须拉低，持续到 FPGA/AR0234 初始化就绪后再释放为高阻。 */
-#define FPGA_PROG_CTRL          (28) 
+#define FX3_SNAP                (60)
+/* U8 (SN74CBTLV3384) 通道 1 (FX3-SPI <-> U5 QSPI Flash) 使能反相输入:
+ *   GPIO28 = FX3_A1 -> U7 (SN74LVC2GU04) 反相 -> U8 1OE
+ *   输出 0 -> U8 1OE = 1 -> 通道 1 断开 (FPGA 独占 U5, 默认运行态)
+ *   输出 1 -> U8 1OE = 0 -> 通道 1 导通 (FX3 SPI 在线读写 U5, 仅烧写 bit 时用)
+ * 硬件默认 R2=4.7k 下拉保底. 该脚不控制 FPGA 的 PROGRAM_B, 请勿望文生义. */
+#define FX3_ISP_ENABLE          (28)
 
 
 
